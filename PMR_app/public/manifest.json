@@ -1,0 +1,20 @@
+{
+  "name": "PMR Industries - Inventory & Expense Manager",
+  "short_name": "PMR Industries",
+  "description": "Manage inventory and expenses for PMR Industries",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "168x102",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "lang": "en",
+  "dir": "ltr"
+}

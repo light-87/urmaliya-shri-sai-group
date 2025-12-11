@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "BucketType" ADD VALUE 'INDIAN_OIL_20L';
