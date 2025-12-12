@@ -28,7 +28,7 @@ const formSchema = z.object({
   warehouse: z.enum(['PALLAVI', 'TULARAM', 'FACTORY']),
   bucketType: z.enum([
     'TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB',
-    'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'AP_BLUE', 'INDIAN_OIL_20L', 'FREE_DEF'
+    'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'
   ]),
   action: z.enum(['STOCK', 'SELL']),
   quantity: z.number().positive('Quantity must be positive'),

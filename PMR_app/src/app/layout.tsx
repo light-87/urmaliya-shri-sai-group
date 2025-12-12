@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PMR Industries - Inventory & Expense Manager",
-  description: "Manage inventory and expenses for PMR Industries",
+  title: "Urmaliya Shri Sai Group",
+  description: "Inventory and Expense Management System",
   manifest: "/manifest.json",
 };
 

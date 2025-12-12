@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { format, subMonths, startOfYear, endOfYear } from 'date-fns'
 
@@ -44,43 +44,46 @@ export async function GET(request: NextRequest) {
       startDate = subMonths(endDate, 12)
     } else if (view === 'alltime') {
       // Get earliest and latest dates from data
-      const earliest = await prisma.expenseTransaction.findFirst({
-        orderBy: { date: 'asc' },
-        select: { date: true },
-      })
-      const latest = await prisma.expenseTransaction.findFirst({
-        orderBy: { date: 'desc' },
-        select: { date: true },
-      })
-      startDate = earliest?.date || new Date()
-      endDate = latest?.date || new Date()
+      const { data: earliest, error: earliestError } = await supabase
+        .from('ExpenseTransaction')
+        .select('date')
+        .order('date', { ascending: true })
+        .limit(1)
+        .single()
+      if (earliestError && earliestError.code !== 'PGRST116') throw earliestError
+
+      const { data: latest, error: latestError } = await supabase
+        .from('ExpenseTransaction')
+        .select('date')
+        .order('date', { ascending: false })
+        .limit(1)
+        .single()
+      if (latestError && latestError.code !== 'PGRST116') throw latestError
+
+      startDate = earliest?.date ? new Date(earliest.date) : new Date()
+      endDate = latest?.date ? new Date(latest.date) : new Date()
     } else {
       // Default to selected year
       startDate = startOfYear(new Date(year, 0, 1))
       endDate = endOfYear(new Date(year, 0, 1))
     }
 
-    // Build where clause with optional account filter
-    const whereClause: any = {
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-    }
+    // Build Supabase query with filters
+    let query = supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .order('date', { ascending: true })
 
     // Add account filter if accounts are specified (not "ALL")
     if (accountsParam && accountsParam !== 'ALL') {
       const accounts = accountsParam.split(',')
-      whereClause.account = {
-        in: accounts,
-      }
+      query = query.in('account', accounts)
     }
 
-    // Fetch all transactions in date range
-    const transactions = await prisma.expenseTransaction.findMany({
-      where: whereClause,
-      orderBy: { date: 'asc' },
-    })
+    const { data: transactions, error } = await query
+    if (error) throw error
 
     // Calculate summary
     let totalIncome = 0

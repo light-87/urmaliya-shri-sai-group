@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { BucketType, Warehouse, ActionType } from '@prisma/client'
+import type { BucketType, Warehouse, ActionType } from '@/types'
 import { BUCKET_SIZES } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic'
 // Validation schema for creating inventory transaction
 const createInventorySchema = z.object({
   date: z.string().transform(str => new Date(str)),
-  warehouse: z.nativeEnum(Warehouse),
-  bucketType: z.nativeEnum(BucketType),
-  action: z.nativeEnum(ActionType),
+  warehouse: z.string() as z.ZodType<Warehouse>,
+  bucketType: z.string() as z.ZodType<BucketType>,
+  action: z.string() as z.ZodType<ActionType>,
   quantity: z.number().positive(),
   buyerSeller: z.string().min(1),
   forceOversell: z.boolean().optional(), // Allow user to confirm overselling
@@ -34,30 +34,34 @@ export async function GET(request: NextRequest) {
     const warehouse = searchParams.get('warehouse') as Warehouse | null
     const bucketType = searchParams.get('bucketType') as BucketType | null
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {}
+    // Build Supabase query
+    let query = supabase
+      .from('InventoryTransaction')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+
+    // Apply filters
     if (date) {
       const startDate = new Date(date)
       startDate.setHours(0, 0, 0, 0)
       const endDate = new Date(date)
       endDate.setHours(23, 59, 59, 999)
-      where.date = { gte: startDate, lte: endDate }
+      query = query.gte('date', startDate.toISOString()).lte('date', endDate.toISOString())
     }
-    if (warehouse) where.warehouse = warehouse
-    if (bucketType) where.bucketType = bucketType
+    if (warehouse) query = query.eq('warehouse', warehouse)
+    if (bucketType) query = query.eq('bucketType', bucketType)
 
-    // Fetch transactions
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where,
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    })
+    const { data: transactions, error } = await query
+
+    if (error) throw error
 
     // Calculate summary - current stock per bucket per warehouse
     const summary = await calculateStockSummary()
 
     return NextResponse.json({
       success: true,
-      transactions,
+      transactions: transactions || [],
       summary,
     })
   } catch (error) {
@@ -116,24 +120,31 @@ export async function POST(request: NextRequest) {
     const newRunningTotal = currentStock + signedQuantity
 
     // Create transaction
-    const transaction = await prisma.inventoryTransaction.create({
-      data: {
-        date: validatedData.date,
+    const { data: transaction, error: createError } = await supabase
+      .from('InventoryTransaction')
+      .insert({
+        date: validatedData.date.toISOString(),
         warehouse: validatedData.warehouse,
         bucketType: validatedData.bucketType,
         action: validatedData.action,
         quantity: signedQuantity,
         buyerSeller: validatedData.buyerSeller,
         runningTotal: newRunningTotal,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (createError) throw createError
 
     // Auto-update stock tracking (only if StockTransaction table exists)
     const bucketSize = BUCKET_SIZES[validatedData.bucketType]
     if (bucketSize > 0) {
       try {
-        // Check if StockTransaction table exists by attempting to find one record
-        await prisma.stockTransaction.findFirst({ take: 1 })
+        // Check if StockTransaction table exists
+        const { data: testData } = await supabase
+          .from('StockTransaction')
+          .select('id')
+          .limit(1)
 
         if (validatedData.action === 'SELL') {
           // Selling buckets: fill them first (subtract from Free DEF), then sell
@@ -177,19 +188,24 @@ async function getCurrentStock(
   bucketType: BucketType,
   warehouse: Warehouse
 ): Promise<number> {
-  const lastTransaction = await prisma.inventoryTransaction.findFirst({
-    where: { bucketType, warehouse },
-    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    select: { runningTotal: true },
-  })
+  const { data: lastTransaction } = await supabase
+    .from('InventoryTransaction')
+    .select('runningTotal')
+    .eq('bucketType', bucketType)
+    .eq('warehouse', warehouse)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
 
   return lastTransaction?.runningTotal || 0
 }
 
 // Helper function to calculate stock summary
 async function calculateStockSummary() {
-  const bucketTypes = Object.values(BucketType)
-  const warehouses = Object.values(Warehouse)
+  // Get bucket types and warehouses from types
+  const bucketTypes = ['TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB', 'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'] as BucketType[]
+  const warehouses = ['PALLAVI', 'TULARAM', 'FACTORY'] as Warehouse[]
 
   const summary = []
 
@@ -205,11 +221,14 @@ async function calculateStockSummary() {
     if (bucketType === 'FREE_DEF') {
       // Get current Free DEF stock from StockBoard (StockTransaction)
       try {
-        const lastStockTransaction = await prisma.stockTransaction.findFirst({
-          where: { category: 'FREE_DEF' },
-          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-          select: { runningTotal: true },
-        })
+        const { data: lastStockTransaction } = await supabase
+          .from('StockTransaction')
+          .select('runningTotal')
+          .eq('category', 'FREE_DEF')
+          .order('date', { ascending: false })
+          .order('createdAt', { ascending: false })
+          .limit(1)
+          .single()
         row.total = lastStockTransaction?.runningTotal || 0
       } catch {
         row.total = 0
@@ -248,25 +267,28 @@ async function createStockTransaction(data: {
   description: string
 }) {
   // Get current stock for this category
-  const lastTransaction = await prisma.stockTransaction.findFirst({
-    where: { category: data.category },
-    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    select: { runningTotal: true },
-  })
+  const { data: lastTransaction } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', data.category)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
 
   const currentStock = lastTransaction?.runningTotal || 0
   const newRunningTotal = currentStock + data.quantity
 
   // Create stock transaction
-  await prisma.stockTransaction.create({
-    data: {
-      date: data.date,
+  await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
       type: data.type,
       category: data.category,
       quantity: data.quantity,
       unit: data.unit,
       description: data.description,
       runningTotal: newRunningTotal,
-    },
-  })
+    })
 }

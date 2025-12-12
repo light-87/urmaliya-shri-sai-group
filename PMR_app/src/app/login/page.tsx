@@ -32,8 +32,9 @@ export default function LoginPage() {
         // Store role in Zustand
         setRole(data.role)
 
-        // Redirect all users to StockBoard as default landing page
-        router.push('/stockboard')
+        // Redirect based on role - REGISTRY_MANAGER goes to registry, others to stockboard
+        const redirectUrl = data.role === 'REGISTRY_MANAGER' ? '/registry' : '/stockboard'
+        router.push(redirectUrl)
       } else {
         setError(data.message || 'Invalid PIN')
         setPin('')
@@ -55,9 +56,9 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-primary">PMR</span>
+            <span className="text-2xl font-bold text-primary">USSG</span>
           </div>
-          <CardTitle className="text-2xl">PMR Industries</CardTitle>
+          <CardTitle className="text-2xl">Urmaliya Shri Sai Group</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
             Enter your PIN to continue
           </p>

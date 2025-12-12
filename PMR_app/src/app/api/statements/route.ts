@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -35,28 +35,25 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {
-      name: { equals: name, mode: 'insensitive' },
+    // Build Supabase query
+    let query = supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .ilike('name', name)  // Case insensitive match
+      .order('date', { ascending: true })
+
+    // Apply date filters
+    if (startDate) {
+      query = query.gte('date', new Date(startDate).toISOString())
+    }
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      query = query.lte('date', end.toISOString())
     }
 
-    if (startDate || endDate) {
-      where.date = {}
-      if (startDate) {
-        (where.date as Record<string, Date>).gte = new Date(startDate)
-      }
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999);
-        (where.date as Record<string, Date>).lte = end
-      }
-    }
-
-    // Fetch transactions
-    const transactions = await prisma.expenseTransaction.findMany({
-      where,
-      orderBy: { date: 'asc' },
-    })
+    const { data: transactions, error } = await query
+    if (error) throw error
 
     // Calculate total balance (income - expense)
     let totalIncome = 0

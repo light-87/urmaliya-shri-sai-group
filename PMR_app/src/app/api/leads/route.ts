@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { LeadStatus, Priority, CallOutcome } from '@prisma/client'
+import { LeadStatus, Priority, CallOutcome } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,23 +42,20 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') as LeadStatus | null
     const priority = searchParams.get('priority') as Priority | null
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {}
+    // Build Supabase query
+    let query = supabase
+      .from('Lead')
+      .select('*', { count: 'exact' })
+      .order('priority', { ascending: false })  // URGENT first
+      .order('nextFollowUpDate', { ascending: true, nullsFirst: false })  // Soonest follow-ups first
+      .order('createdAt', { ascending: false })  // Newest first
 
-    if (status) where.status = status
-    if (priority) where.priority = priority
+    // Apply filters
+    if (status) query = query.eq('status', status)
+    if (priority) query = query.eq('priority', priority)
 
-    // Fetch all leads
-    const leads = await prisma.lead.findMany({
-      where,
-      orderBy: [
-        { priority: 'desc' }, // URGENT first
-        { nextFollowUpDate: 'asc' }, // Soonest follow-ups first
-        { createdAt: 'desc' }, // Newest first
-      ],
-    })
-
-    const total = await prisma.lead.count({ where })
+    const { data: leads, error, count: total } = await query
+    if (error) throw error
 
     return NextResponse.json({
       success: true,
@@ -107,20 +104,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create lead
-    const lead = await prisma.lead.create({
-      data: {
+    const { data: lead, error } = await supabase
+      .from('Lead')
+      .insert({
         name: validatedData.name,
         phone: validatedData.phone,
         company: validatedData.company,
         status: validatedData.status || 'NEW',
         priority: validatedData.priority || 'MEDIUM',
-        lastCallDate,
-        nextFollowUpDate,
+        lastCallDate: lastCallDate?.toISOString(),
+        nextFollowUpDate: nextFollowUpDate?.toISOString(),
         callOutcome: validatedData.callOutcome,
         quickNote: validatedData.quickNote,
         additionalNotes: validatedData.additionalNotes,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json({
       success: true,

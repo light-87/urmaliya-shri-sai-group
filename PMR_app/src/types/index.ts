@@ -1,12 +1,12 @@
 // Session Types
 export interface SessionData {
   pinId: string
-  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY'
+  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
   expiresAt: number
 }
 
 // Enum Types (mirror Prisma enums)
-export type PinRole = 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY'
+export type PinRole = 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
 
 export type Warehouse = 'PALLAVI' | 'TULARAM' | 'FACTORY'
 
@@ -22,7 +22,7 @@ export type BucketType =
   | 'MH_10_LTR'
   | 'TATA_10_LTR'
   | 'IBC_TANK'
-  | 'AP_BLUE'
+  | 'ECO'
   | 'INDIAN_OIL_20L'
   | 'FREE_DEF'
 
@@ -181,7 +181,7 @@ export const BUCKET_TYPE_LABELS: Record<BucketType, string> = {
   MH_10_LTR: 'MH 10 Ltr',
   TATA_10_LTR: 'TATA 10 Ltr',
   IBC_TANK: 'IBC tank',
-  AP_BLUE: 'AP Blue',
+  ECO: 'Eco',
   INDIAN_OIL_20L: 'Indian Oil 20 Ltr',
   FREE_DEF: 'Free DEF',
 }
@@ -199,7 +199,7 @@ export const BUCKET_SIZES: Record<BucketType, number> = {
   MH_10_LTR: 10,
   TATA_10_LTR: 10,
   IBC_TANK: 0, // Not counted as sellable product (for counting empty tanks)
-  AP_BLUE: 20,
+  ECO: 20,
   INDIAN_OIL_20L: 20,
   FREE_DEF: 0, // Not counted (liters tracked separately in quantity field)
 }

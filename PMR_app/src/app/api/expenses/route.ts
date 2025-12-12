@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { ExpenseAccount, TransactionType } from '@prisma/client'
+import { ExpenseAccount, TransactionType } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,43 +43,37 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {}
+    // Build Supabase query
+    let query = supabase
+      .from('ExpenseTransaction')
+      .select('*', { count: 'exact' })
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
 
-    if (startDate || endDate) {
-      where.date = {}
-      if (startDate) {
-        (where.date as Record<string, Date>).gte = new Date(startDate)
-      }
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999);
-        (where.date as Record<string, Date>).lte = end
-      }
+    // Apply filters
+    if (startDate) {
+      query = query.gte('date', new Date(startDate).toISOString())
     }
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      query = query.lte('date', end.toISOString())
+    }
+    if (account) query = query.eq('account', account)
+    if (type) query = query.eq('type', type)
+    if (name) query = query.ilike('name', `%${name}%`)
 
-    if (account) where.account = account
-    if (type) where.type = type
-    if (name) where.name = { contains: name, mode: 'insensitive' }
-
-    // Get total count for pagination
-    const total = await prisma.expenseTransaction.count({ where })
-
-    // Fetch transactions
-    const transactions = await prisma.expenseTransaction.findMany({
-      where,
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-    })
+    const { data: transactions, error, count: total } = await query
+    if (error) throw error
 
     // Get unique names for autocomplete
-    const uniqueNamesResult = await prisma.expenseTransaction.findMany({
-      select: { name: true },
-      distinct: ['name'],
-      orderBy: { name: 'asc' },
-    })
-    const uniqueNames = uniqueNamesResult.map(r => r.name)
+    const { data: namesData } = await supabase
+      .from('ExpenseTransaction')
+      .select('name')
+      .order('name', { ascending: true })
+
+    const uniqueNames = [...new Set(namesData?.map(r => r.name) || [])]
 
     return NextResponse.json({
       success: true,
@@ -124,15 +118,19 @@ export async function POST(request: NextRequest) {
     const validatedData = createExpenseSchema.parse(body)
 
     // Create transaction
-    const transaction = await prisma.expenseTransaction.create({
-      data: {
-        date: validatedData.date,
+    const { data: transaction, error } = await supabase
+      .from('ExpenseTransaction')
+      .insert({
+        date: validatedData.date.toISOString(),
         amount: validatedData.amount,
         account: validatedData.account,
         type: validatedData.type,
         name: validatedData.name,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json({
       success: true,

@@ -33,8 +33,13 @@ export async function middleware(request: NextRequest) {
     const { payload } = await jwtVerify(token, SECRET_KEY)
     const role = payload.role as string
 
-    // Admin-only routes
-    if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/statements')) {
+    // Admin-only routes (now includes Daily Report)
+    if (
+      path.startsWith('/admin') ||
+      path.startsWith('/dashboard') ||
+      path.startsWith('/statements') ||
+      path.startsWith('/daily-report')
+    ) {
       if (role !== 'ADMIN') {
         return NextResponse.redirect(new URL('/inventory', request.url))
       }
@@ -43,6 +48,13 @@ export async function middleware(request: NextRequest) {
     // Expense routes - require ADMIN or EXPENSE_INVENTORY
     if (path.startsWith('/expenses')) {
       if (role === 'INVENTORY_ONLY') {
+        return NextResponse.redirect(new URL('/inventory', request.url))
+      }
+    }
+
+    // Registry routes - require ADMIN or REGISTRY_MANAGER
+    if (path.startsWith('/registry')) {
+      if (role !== 'ADMIN' && role !== 'REGISTRY_MANAGER') {
         return NextResponse.redirect(new URL('/inventory', request.url))
       }
     }

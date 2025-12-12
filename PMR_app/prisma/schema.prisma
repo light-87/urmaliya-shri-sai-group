@@ -26,9 +26,10 @@ model Pin {
 }
 
 enum PinRole {
-  ADMIN             // PIN 1: Full access
+  ADMIN             // PIN 1: Full access + Registry (with toggle)
   EXPENSE_INVENTORY // PIN 2: Expenses + Inventory
   INVENTORY_ONLY    // PIN 3: Inventory only
+  REGISTRY_MANAGER  // PIN 4: Registry only
 }
 
 // ============================================
@@ -71,7 +72,7 @@ enum BucketType {
   MH_10_LTR
   TATA_10_LTR
   IBC_TANK
-  AP_BLUE
+  ECO
   INDIAN_OIL_20L
   FREE_DEF
 }
