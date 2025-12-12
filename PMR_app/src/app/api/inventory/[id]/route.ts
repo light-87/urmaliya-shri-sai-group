@@ -76,8 +76,8 @@ export async function PUT(
 
     // Recalculate running totals for all subsequent transactions
     await recalculateRunningTotals(
-      updatedData.bucketType,
-      updatedData.warehouse
+      updatedData.bucketType as any,
+      updatedData.warehouse as any
     )
 
     // Also recalculate old bucket/warehouse if changed
@@ -85,7 +85,7 @@ export async function PUT(
       validatedData.bucketType && validatedData.bucketType !== existing.bucketType ||
       validatedData.warehouse && validatedData.warehouse !== existing.warehouse
     ) {
-      await recalculateRunningTotals(existing.bucketType, existing.warehouse)
+      await recalculateRunningTotals(existing.bucketType as any, existing.warehouse as any)
     }
 
     return NextResponse.json({

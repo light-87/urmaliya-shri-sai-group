@@ -71,11 +71,11 @@ export async function PUT(
     })
 
     // Recalculate running totals for this category
-    await recalculateRunningTotals(updatedData.category)
+    await recalculateRunningTotals(updatedData.category as any)
 
     // Also recalculate old category if changed
     if (validatedData.category && validatedData.category !== existing.category) {
-      await recalculateRunningTotals(existing.category)
+      await recalculateRunningTotals(existing.category as any)
     }
 
     return NextResponse.json({
@@ -139,7 +139,7 @@ export async function DELETE(
     })
 
     // Recalculate running totals
-    await recalculateRunningTotals(transaction.category)
+    await recalculateRunningTotals(transaction.category as any)
 
     return NextResponse.json({
       success: true,
