@@ -1,6 +1,7 @@
 {
   "name": "ussg-app",
   "version": "1.0.0",
+  "description": "Inventory and Expense Management System for Urmaliya Shri Sai Group",
   "private": true,
   "scripts": {
     "dev": "next dev",

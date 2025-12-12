@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { useAuthStore } from '@/store/authStore'
+import { useModeStore } from '@/store/modeStore'
 import { cn } from '@/lib/utils'
 import { Menu, X, LogOut } from 'lucide-react'
 
@@ -12,6 +14,7 @@ export function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const { role, clearAuth } = useAuthStore()
+  const { mode, toggleMode } = useModeStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -24,10 +27,11 @@ export function Header() {
     }
   }
 
-  const navItems = [
+  // DEF Mode navigation items
+  const defNavItems = [
     { href: '/stockboard', label: 'StockBoard', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'INVENTORY_ONLY'] },
     { href: '/inventory', label: 'Inventory', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'INVENTORY_ONLY'] },
-    { href: '/daily-report', label: 'Daily Report', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'INVENTORY_ONLY'] },
+    { href: '/daily-report', label: 'Daily Report', roles: ['ADMIN'] },
     { href: '/leads', label: 'Leads', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
     { href: '/expenses', label: 'Expenses', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
     { href: '/search', label: 'Search', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
@@ -35,6 +39,27 @@ export function Header() {
     { href: '/statements', label: 'Statements', roles: ['ADMIN'] },
     { href: '/admin', label: 'Admin', roles: ['ADMIN'] },
   ]
+
+  // Registry Mode navigation items
+  const registryNavItems = [
+    { href: '/registry', label: 'Registry', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
+    { href: '/registry/expenses', label: 'Registry Expenses', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
+    { href: '/registry/search', label: 'Registry Search', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
+    { href: '/registry/dashboard', label: 'Registry Dashboard', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
+  ]
+
+  // Select appropriate nav items based on role and mode
+  const getNavItems = () => {
+    if (role === 'REGISTRY_MANAGER') {
+      return registryNavItems
+    }
+    if (role === 'ADMIN') {
+      return mode === 'DEF' ? defNavItems : registryNavItems
+    }
+    return defNavItems
+  }
+
+  const navItems = getNavItems()
 
   const visibleNavItems = navItems.filter(item =>
     role && item.roles.includes(role)
@@ -46,10 +71,10 @@ export function Header() {
         <div className="flex items-center gap-6">
           <Link href="/inventory" className="flex items-center gap-2">
             <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-primary">PMR</span>
+              <span className="text-xs font-bold text-primary">USSG</span>
             </div>
             <span className="hidden font-semibold sm:inline-block">
-              PMR Industries
+              Urmaliya Shri Sai Group
             </span>
           </Link>
 
@@ -73,6 +98,29 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Mode Toggle - Only for Admin */}
+          {role === 'ADMIN' && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
+              <span className={cn(
+                'text-xs font-medium transition-colors',
+                mode === 'DEF' ? 'text-primary' : 'text-muted-foreground'
+              )}>
+                DEF
+              </span>
+              <Switch
+                checked={mode === 'REGISTRY'}
+                onCheckedChange={toggleMode}
+                className="data-[state=checked]:bg-primary"
+              />
+              <span className={cn(
+                'text-xs font-medium transition-colors',
+                mode === 'REGISTRY' ? 'text-primary' : 'text-muted-foreground'
+              )}>
+                Registry
+              </span>
+            </div>
+          )}
+
           {role && (
             <span className="hidden sm:inline-block text-xs text-muted-foreground px-2 py-1 bg-muted rounded">
               {role.replace('_', ' ')}

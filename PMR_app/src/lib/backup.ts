@@ -218,7 +218,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
 
     // Create filename with timestamp
     const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm-ss')
-    const fileName = `PMR_Backup_${timestamp}.xlsx`
+    const fileName = `USSG_Backup_${timestamp}.xlsx`
 
     // Upload to Google Drive
     const driveFileId = await uploadBackupToDrive(buffer, fileName)
