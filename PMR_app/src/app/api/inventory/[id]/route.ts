@@ -174,7 +174,7 @@ export async function DELETE(
     }
 
     // If this is a regular bucket transaction, delete corresponding StockTransactions
-    const bucketSize = await getBucketSize(transaction.bucketType)
+    const bucketSize = await getBucketSize(transaction.bucketType as any)
     if (bucketSize > 0) {
       try {
         // Find StockTransactions created when this inventory transaction was made
