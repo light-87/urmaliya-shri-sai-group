@@ -31,30 +31,33 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {}
+    // Build Supabase query with filters
+    let query = supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
 
-    if (startDate || endDate) {
-      where.date = {}
-      if (startDate) {
-        (where.date as Record<string, Date>).gte = new Date(startDate)
-      }
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999)
-        ;(where.date as Record<string, Date>).lte = end
-      }
+    if (startDate) {
+      query = query.gte('date', new Date(startDate).toISOString())
+    }
+    if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      query = query.lte('date', end.toISOString())
+    }
+    if (account) {
+      query = query.eq('account', account)
+    }
+    if (type) {
+      query = query.eq('type', type)
+    }
+    if (name) {
+      query = query.ilike('name', `%${name}%`)
     }
 
-    if (account) where.account = account
-    if (type) where.type = type
-    if (name) where.name = { contains: name, mode: 'insensitive' }
-
-    // Fetch transactions
-    const transactions = await prisma.expenseTransaction.findMany({
-      where,
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    })
+    const { data: transactions, error } = await query
+    if (error) throw error
 
     // Calculate totals
     let totalIncome = 0
