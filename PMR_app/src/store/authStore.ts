@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 interface AuthState {
-  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | null
+  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER' | null
   setRole: (role: AuthState['role']) => void
   clearAuth: () => void
 }
