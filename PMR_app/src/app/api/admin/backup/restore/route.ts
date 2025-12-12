@@ -206,9 +206,9 @@ export async function POST(request: NextRequest) {
           await prisma.inventoryTransaction.create({
             data: {
               date: parseBackupDate(row.Date),
-              warehouse: row.Warehouse as Warehouse,
-              bucketType: row['Bucket Type'] as BucketType,
-              action: row.Action as ActionType,
+              warehouse: row.Warehouse as any,
+              bucketType: row['Bucket Type'] as any,
+              action: row.Action as any,
               quantity: Number(row.Quantity),
               buyerSeller: row['Buyer/Seller'] || 'N/A',
               runningTotal: Number(row['Running Total']),
@@ -233,8 +233,8 @@ export async function POST(request: NextRequest) {
             data: {
               date: parseBackupDate(row.Date),
               amount: Number(row.Amount),
-              account: row.Account as ExpenseAccount,
-              type: row.Type as TransactionType,
+              account: row.Account as any,
+              type: row.Type as any,
               name: row.Name || 'N/A',
             },
           })
@@ -257,10 +257,10 @@ export async function POST(request: NextRequest) {
             await prisma.stockTransaction.create({
               data: {
                 date: parseBackupDate(row.Date),
-                type: row.Type as StockTransactionType,
-                category: row.Category as StockCategory,
+                type: row.Type as any,
+                category: row.Category as any,
                 quantity: Number(row.Quantity),
-                unit: row.Unit as StockUnit,
+                unit: row.Unit as any,
                 description: row.Description || null,
                 runningTotal: Number(row['Running Total']),
               },
@@ -281,11 +281,11 @@ export async function POST(request: NextRequest) {
                 name: row.Name || 'Unknown',
                 phone: row.Phone || '',
                 company: row.Company || null,
-                status: (row.Status as LeadStatus) || 'NEW',
-                priority: (row.Priority as Priority) || 'MEDIUM',
+                status: (row.Status as any) || 'NEW',
+                priority: (row.Priority as any) || 'MEDIUM',
                 lastCallDate: row['Last Call Date'] ? parseBackupDate(row['Last Call Date']) : null,
                 nextFollowUpDate: row['Next Follow-Up'] ? parseBackupDate(row['Next Follow-Up']) : null,
-                callOutcome: row['Call Outcome'] ? (row['Call Outcome'] as CallOutcome) : null,
+                callOutcome: row['Call Outcome'] ? (row['Call Outcome'] as any) : null,
                 quickNote: row['Quick Note'] || null,
                 additionalNotes: row['Additional Notes'] || null,
               },
@@ -304,7 +304,7 @@ export async function POST(request: NextRequest) {
             await prisma.pin.create({
               data: {
                 pinNumber: row['PIN Number'] || '',
-                role: (row.Role as PinRole) || 'INVENTORY_ONLY',
+                role: (row.Role as any) || 'INVENTORY_ONLY',
               },
             })
             pinsRestored++
