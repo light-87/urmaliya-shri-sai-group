@@ -212,7 +212,7 @@ export async function DELETE(
     })
 
     // Recalculate inventory running totals
-    await recalculateRunningTotals(transaction.bucketType, transaction.warehouse)
+    await recalculateRunningTotals(transaction.bucketType as any, transaction.warehouse as any)
 
     return NextResponse.json({
       success: true,
