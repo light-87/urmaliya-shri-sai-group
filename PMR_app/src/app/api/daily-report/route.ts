@@ -40,61 +40,66 @@ export async function GET(request: NextRequest) {
 
     // Fetch all data in parallel
     const [
-      expenseTransactions,
-      prevExpenseTransactions,
-      inventoryTransactions,
-      inventorySummary,
-      stockTransactions,
-      stockSummary,
+      expenseResult,
+      prevExpenseResult,
+      inventoryResult,
+      inventorySummaryResult,
+      stockResult,
+      stockSummaryResult,
     ] = await Promise.all([
       // Current day expenses
-      prisma.expenseTransaction.findMany({
-        where: {
-          date: {
-            gte: dayStart,
-            lte: dayEnd,
-          },
-        },
-        orderBy: { date: 'desc' },
-      }),
+      supabase
+        .from('ExpenseTransaction')
+        .select('*')
+        .gte('date', dayStart.toISOString())
+        .lte('date', dayEnd.toISOString())
+        .order('date', { ascending: false }),
       // Previous day expenses for comparison
-      prisma.expenseTransaction.findMany({
-        where: {
-          date: {
-            gte: prevDayStart,
-            lte: prevDayEnd,
-          },
-        },
-      }),
+      supabase
+        .from('ExpenseTransaction')
+        .select('*')
+        .gte('date', prevDayStart.toISOString())
+        .lte('date', prevDayEnd.toISOString()),
       // Current day inventory
-      prisma.inventoryTransaction.findMany({
-        where: {
-          date: {
-            gte: dayStart,
-            lte: dayEnd,
-          },
-        },
-        orderBy: { date: 'desc' },
-      }),
+      supabase
+        .from('InventoryTransaction')
+        .select('*')
+        .gte('date', dayStart.toISOString())
+        .lte('date', dayEnd.toISOString())
+        .order('date', { ascending: false }),
       // Current inventory summary (all warehouses)
-      prisma.inventoryTransaction.findMany({
-        orderBy: { date: 'asc' },
-      }),
+      supabase
+        .from('InventoryTransaction')
+        .select('*')
+        .order('date', { ascending: true }),
       // Current day stock transactions
-      prisma.stockTransaction.findMany({
-        where: {
-          date: {
-            gte: dayStart,
-            lte: dayEnd,
-          },
-        },
-        orderBy: { date: 'desc' },
-      }),
+      supabase
+        .from('StockTransaction')
+        .select('*')
+        .gte('date', dayStart.toISOString())
+        .lte('date', dayEnd.toISOString())
+        .order('date', { ascending: false }),
       // Get latest stock summary
-      prisma.stockTransaction.findMany({
-        orderBy: { date: 'asc' },
-      }),
+      supabase
+        .from('StockTransaction')
+        .select('*')
+        .order('date', { ascending: true }),
     ])
+
+    // Check for errors
+    if (expenseResult.error) throw expenseResult.error
+    if (prevExpenseResult.error) throw prevExpenseResult.error
+    if (inventoryResult.error) throw inventoryResult.error
+    if (inventorySummaryResult.error) throw inventorySummaryResult.error
+    if (stockResult.error) throw stockResult.error
+    if (stockSummaryResult.error) throw stockSummaryResult.error
+
+    const expenseTransactions = expenseResult.data || []
+    const prevExpenseTransactions = prevExpenseResult.data || []
+    const inventoryTransactions = inventoryResult.data || []
+    const inventorySummary = inventorySummaryResult.data || []
+    const stockTransactions = stockResult.data || []
+    const stockSummary = stockSummaryResult.data || []
 
     // Calculate Financial Metrics
     const financial = calculateFinancialMetrics(
