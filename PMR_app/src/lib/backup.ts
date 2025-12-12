@@ -119,7 +119,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const workbook = XLSX.utils.book_new()
 
     // Create Inventory sheet
-    const inventoryData = inventoryTransactions.map((tx) => ({
+    const inventoryData = inventoryTransactions.map((tx: any) => ({
       ID: tx.id,
       Date: format(new Date(tx.date), 'yyyy-MM-dd'),
       Warehouse: tx.warehouse,
@@ -134,7 +134,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     XLSX.utils.book_append_sheet(workbook, inventorySheet, 'Inventory')
 
     // Create Expenses sheet
-    const expenseData = expenseTransactions.map((tx) => ({
+    const expenseData = expenseTransactions.map((tx: any) => ({
       ID: tx.id,
       Date: format(new Date(tx.date), 'yyyy-MM-dd'),
       Amount: Number(tx.amount),

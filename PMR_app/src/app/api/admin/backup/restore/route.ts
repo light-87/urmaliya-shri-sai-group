@@ -17,7 +17,7 @@ import {
   Priority,
   CallOutcome,
   PinRole,
-} from '@prisma/client'
+} from '@/types'
 
 export const dynamic = 'force-dynamic'
 

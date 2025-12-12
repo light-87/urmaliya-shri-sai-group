@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { BucketType, Warehouse, ActionType, StockCategory } from '@prisma/client'
-import { BUCKET_SIZES } from '@/types'
+import { BucketType, Warehouse, ActionType, StockCategory, StockTransactionType, BUCKET_SIZES } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,7 +145,7 @@ export async function DELETE(
 
     // If this is a FACTORY + FREE_DEF transaction (from Sell Free DEF),
     // we need to also delete the corresponding StockTransactions
-    if (transaction.warehouse === 'FACTORY' && transaction.bucketType === 'FREE_DEF' && transaction.action === 'SELL') {
+    if (transaction.warehouse === Warehouse.FACTORY && transaction.bucketType === BucketType.FREE_DEF && transaction.action === ActionType.SELL) {
       try {
         // Find and delete corresponding StockTransactions by matching date and quantity
         // When selling Free DEF, we created 2 StockTransactions:
@@ -155,7 +154,7 @@ export async function DELETE(
         const stockTransactionsToDelete = await prisma.stockTransaction.findMany({
           where: {
             date: transaction.date,
-            type: 'SELL_FREE_DEF',
+            type: StockTransactionType.SELL_FREE_DEF,
             quantity: -Math.abs(transaction.quantity), // Stock uses negative for sells
           },
         })
@@ -166,8 +165,8 @@ export async function DELETE(
         }
 
         // Recalculate StockTransaction running totals for affected categories
-        await recalculateStockRunningTotals('FREE_DEF')
-        await recalculateStockRunningTotals('FINISHED_GOODS')
+        await recalculateStockRunningTotals(StockCategory.FREE_DEF)
+        await recalculateStockRunningTotals(StockCategory.FINISHED_GOODS)
       } catch (stockError) {
         console.error('Failed to delete/recalculate stock transactions:', stockError)
         // Continue anyway - at least delete the inventory transaction
@@ -179,9 +178,9 @@ export async function DELETE(
     if (bucketSize > 0) {
       try {
         // Find StockTransactions created when this inventory transaction was made
-        const stockType = transaction.action === 'STOCK' ? 'FILL_BUCKETS' : 'SELL_BUCKETS'
-        const stockCategory = transaction.action === 'STOCK' ? 'FREE_DEF' : 'FINISHED_GOODS'
-        const expectedQuantity = transaction.action === 'STOCK'
+        const stockType = transaction.action === ActionType.STOCK ? StockTransactionType.FILL_BUCKETS : StockTransactionType.SELL_BUCKETS
+        const stockCategory = transaction.action === ActionType.STOCK ? StockCategory.FREE_DEF : StockCategory.FINISHED_GOODS
+        const expectedQuantity = transaction.action === ActionType.STOCK
           ? -(Math.abs(transaction.quantity) * bucketSize)
           : -(Math.abs(transaction.quantity) * bucketSize)
 

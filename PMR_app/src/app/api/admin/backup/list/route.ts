@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Merge drive files with backup logs
     const backupsWithMetadata = driveFiles.map((file) => {
-      const log = backupLogs.find((backupLog) => backupLog.driveFileId === file.id)
+      const log = backupLogs.find((backupLog: any) => backupLog.driveFileId === file.id)
 
       return {
         id: file.id,

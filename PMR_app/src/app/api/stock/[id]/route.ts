@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { StockTransactionType, StockCategory, StockUnit } from '@prisma/client'
+import { StockTransactionType, StockCategory, StockUnit } from '@/types'
 
 export const dynamic = 'force-dynamic'
 

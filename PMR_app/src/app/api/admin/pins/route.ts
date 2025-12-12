@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { PinRole } from '@prisma/client'
+import { PinRole } from '@/types'
 
 export const dynamic = 'force-dynamic'
 

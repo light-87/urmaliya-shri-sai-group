@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { ParsedExcelData, InventoryRow, ExpenseRow } from '@/lib/excel-parser'
-import { BucketType, Warehouse } from '@prisma/client'
+import { BucketType, Warehouse } from '@/types'
 
 export interface ImportError {
   type: 'inventory' | 'expense'

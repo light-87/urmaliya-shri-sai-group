@@ -20,11 +20,11 @@ import { SummaryCards } from './components/SummaryCards'
 import { MonthlyBarChart } from './components/MonthlyBarChart'
 import { MonthlyTable } from './components/MonthlyTable'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import type { DashboardResponse, ExpenseAccount } from '@/types'
-import { ACCOUNT_LABELS } from '@/types'
+import type { DashboardResponse } from '@/types'
+import { ExpenseAccount, ACCOUNT_LABELS } from '@/types'
 import { Check, ChevronsUpDown } from 'lucide-react'
 
-const allAccounts: ExpenseAccount[] = ['CASH', 'PRASHANT_GAYDHANE', 'PMR', 'KPG_SAVING', 'KP_ENTERPRISES']
+const allAccounts: ExpenseAccount[] = Object.values(ExpenseAccount)
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null)

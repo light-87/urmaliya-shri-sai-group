@@ -1,3 +1,11 @@
+// JavaScript enums
+export enum PinRole {
+  ADMIN = 'ADMIN',
+  EXPENSE_INVENTORY = 'EXPENSE_INVENTORY',
+  INVENTORY_ONLY = 'INVENTORY_ONLY',
+  REGISTRY_MANAGER = 'REGISTRY_MANAGER',
+}
+
 // Session Types
 export interface SessionData {
   pinId: string
@@ -5,37 +13,48 @@ export interface SessionData {
   expiresAt: number
 }
 
-// Enum Types (mirror Prisma enums)
-export type PinRole = 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
+export enum Warehouse {
+  PALLAVI = 'PALLAVI',
+  TULARAM = 'TULARAM',
+  FACTORY = 'FACTORY',
+}
 
-export type Warehouse = 'PALLAVI' | 'TULARAM' | 'FACTORY'
+// JavaScript enum for BucketType
+export enum BucketType {
+  TATA_G = 'TATA_G',
+  TATA_W = 'TATA_W',
+  TATA_HP = 'TATA_HP',
+  AL_10_LTR = 'AL_10_LTR',
+  AL = 'AL',
+  BB = 'BB',
+  ES = 'ES',
+  MH = 'MH',
+  MH_10_LTR = 'MH_10_LTR',
+  TATA_10_LTR = 'TATA_10_LTR',
+  IBC_TANK = 'IBC_TANK',
+  ECO = 'ECO',
+  INDIAN_OIL_20L = 'INDIAN_OIL_20L',
+  FREE_DEF = 'FREE_DEF',
+}
 
-export type BucketType =
-  | 'TATA_G'
-  | 'TATA_W'
-  | 'TATA_HP'
-  | 'AL_10_LTR'
-  | 'AL'
-  | 'BB'
-  | 'ES'
-  | 'MH'
-  | 'MH_10_LTR'
-  | 'TATA_10_LTR'
-  | 'IBC_TANK'
-  | 'ECO'
-  | 'INDIAN_OIL_20L'
-  | 'FREE_DEF'
+export enum ActionType {
+  STOCK = 'STOCK',
+  SELL = 'SELL',
+}
 
-export type ActionType = 'STOCK' | 'SELL'
+// JavaScript enums for Zod validation
+export enum ExpenseAccount {
+  CASH = 'CASH',
+  PRASHANT_GAYDHANE = 'PRASHANT_GAYDHANE',
+  PMR = 'PMR',
+  KPG_SAVING = 'KPG_SAVING',
+  KP_ENTERPRISES = 'KP_ENTERPRISES',
+}
 
-export type ExpenseAccount =
-  | 'CASH'
-  | 'PRASHANT_GAYDHANE'
-  | 'PMR'
-  | 'KPG_SAVING'
-  | 'KP_ENTERPRISES'
-
-export type TransactionType = 'INCOME' | 'EXPENSE'
+export enum TransactionType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE',
+}
 
 // API Response Types
 export interface ApiResponse<T = unknown> {
@@ -218,17 +237,26 @@ export const WAREHOUSE_LABELS: Record<Warehouse, string> = {
   FACTORY: 'Factory',
 }
 
-// Stock Tracking Types
-export type StockTransactionType =
-  | 'ADD_UREA'
-  | 'PRODUCE_BATCH'
-  | 'SELL_FREE_DEF'
-  | 'FILL_BUCKETS'
-  | 'SELL_BUCKETS'
+// Stock Tracking Types - JavaScript enums for Zod validation
+export enum StockTransactionType {
+  ADD_UREA = 'ADD_UREA',
+  PRODUCE_BATCH = 'PRODUCE_BATCH',
+  SELL_FREE_DEF = 'SELL_FREE_DEF',
+  FILL_BUCKETS = 'FILL_BUCKETS',
+  SELL_BUCKETS = 'SELL_BUCKETS',
+}
 
-export type StockCategory = 'UREA' | 'FREE_DEF' | 'FINISHED_GOODS'
+export enum StockCategory {
+  UREA = 'UREA',
+  FREE_DEF = 'FREE_DEF',
+  FINISHED_GOODS = 'FINISHED_GOODS',
+}
 
-export type StockUnit = 'KG' | 'LITERS' | 'BAGS'
+export enum StockUnit {
+  KG = 'KG',
+  LITERS = 'LITERS',
+  BAGS = 'BAGS',
+}
 
 export interface StockTransaction {
   id: string
@@ -383,27 +411,34 @@ export interface DailyReportResponse {
   error?: string
 }
 
-// Lead Types
-export type LeadStatus =
-  | 'NEW'
-  | 'NEED_TO_CALL'
-  | 'CALLED'
-  | 'GOT_RESPONSE'
-  | 'ON_HOLD'
-  | 'CALL_IN_7_DAYS'
-  | 'CONVERTED'
-  | 'NOT_INTERESTED'
+// Lead Types - JavaScript enums for Zod validation
+export enum LeadStatus {
+  NEW = 'NEW',
+  NEED_TO_CALL = 'NEED_TO_CALL',
+  CALLED = 'CALLED',
+  GOT_RESPONSE = 'GOT_RESPONSE',
+  ON_HOLD = 'ON_HOLD',
+  CALL_IN_7_DAYS = 'CALL_IN_7_DAYS',
+  CONVERTED = 'CONVERTED',
+  NOT_INTERESTED = 'NOT_INTERESTED',
+}
 
-export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+export enum Priority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
+}
 
-export type CallOutcome =
-  | 'NO_ANSWER'
-  | 'BUSY'
-  | 'INTERESTED'
-  | 'NEED_INFO'
-  | 'CALL_BACK_LATER'
-  | 'WRONG_NUMBER'
-  | 'NOT_INTERESTED_NOW'
+export enum CallOutcome {
+  NO_ANSWER = 'NO_ANSWER',
+  BUSY = 'BUSY',
+  INTERESTED = 'INTERESTED',
+  NEED_INFO = 'NEED_INFO',
+  CALL_BACK_LATER = 'CALL_BACK_LATER',
+  WRONG_NUMBER = 'WRONG_NUMBER',
+  NOT_INTERESTED_NOW = 'NOT_INTERESTED_NOW',
+}
 
 export interface Lead {
   id: string

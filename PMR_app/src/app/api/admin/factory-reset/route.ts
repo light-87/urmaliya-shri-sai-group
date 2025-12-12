@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete all data in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Delete Stock Transactions
       const stockDeleted = await tx.stockTransaction.deleteMany()
 

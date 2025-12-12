@@ -79,10 +79,10 @@ export async function GET(request: NextRequest) {
       success: true,
       transactions,
       pagination: {
-        total,
+        total: total || 0,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil((total || 0) / limit),
       },
       uniqueNames,
     })
