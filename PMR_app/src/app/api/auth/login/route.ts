@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { createSession } from '@/lib/auth'
 import { triggerBackupIfNeeded } from '@/lib/backup'
 
@@ -17,12 +17,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find PIN in database
-    const pinRecord = await prisma.pin.findUnique({
-      where: { pinNumber: pin },
-    })
+    // Find PIN in database using Supabase
+    const { data: pinRecord, error } = await supabase
+      .from('Pin')
+      .select('*')
+      .eq('pinNumber', pin)
+      .single()
 
-    if (!pinRecord) {
+    if (error || !pinRecord) {
       return NextResponse.json(
         { success: false, message: 'Invalid PIN' },
         { status: 401 }
