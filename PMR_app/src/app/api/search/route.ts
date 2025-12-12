@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
-import { ExpenseAccount, TransactionType } from '@prisma/client'
+import { ExpenseAccount, TransactionType } from '@/types'
 
 export const dynamic = 'force-dynamic'
 

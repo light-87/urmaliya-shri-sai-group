@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { LeadStatus, Priority, CallOutcome } from '@prisma/client'
+import { LeadStatus, Priority, CallOutcome } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
