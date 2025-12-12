@@ -67,7 +67,7 @@ export async function PUT(
     // Update the transaction
     const transaction = await prisma.stockTransaction.update({
       where: { id },
-      data: updatedData,
+      data: updatedData as any,
     })
 
     // Recalculate running totals for this category

@@ -56,7 +56,7 @@ export async function PUT(
     // Update the transaction
     const transaction = await prisma.expenseTransaction.update({
       where: { id },
-      data: validatedData,
+      data: validatedData as any,
     })
 
     return NextResponse.json({

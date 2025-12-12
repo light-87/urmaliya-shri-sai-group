@@ -75,7 +75,7 @@ export async function PUT(
     // Update the lead
     const lead = await prisma.lead.update({
       where: { id },
-      data: updateData,
+      data: updateData as any,
     })
 
     return NextResponse.json({
