@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
-import { StockTransactionType, StockCategory, StockUnit, BucketType } from '@prisma/client'
+import { StockTransactionType, StockCategory, StockUnit, BucketType } from '@/types'
 import { BUCKET_SIZES, UREA_PER_BATCH_KG, LITERS_PER_BATCH } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -32,9 +32,12 @@ export async function GET(request: NextRequest) {
     // All authenticated users can view stock
 
     // Check if table exists first
-    try {
-      await prisma.stockTransaction.findFirst({ take: 1 })
-    } catch (tableError) {
+    const { error: tableCheckError } = await supabase
+      .from('StockTransaction')
+      .select('id')
+      .limit(1)
+
+    if (tableCheckError && tableCheckError.code === '42P01') {
       // Table doesn't exist yet - return empty data
       return NextResponse.json({
         success: true,
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
           bucketsInLiters: 0,
           finishedGoods: 0,
         },
-        message: 'Database migration pending. Please run: npx prisma migrate deploy'
+        message: 'Database migration pending. StockTransaction table not found.'
       })
     }
 
@@ -55,22 +58,26 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
     const category = searchParams.get('category') as StockCategory | null
 
-    // Build filter conditions
-    const where: Record<string, unknown> = {}
+    // Build Supabase query
+    let query = supabase
+      .from('StockTransaction')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+
     if (date) {
       const startDate = new Date(date)
       startDate.setHours(0, 0, 0, 0)
       const endDate = new Date(date)
       endDate.setHours(23, 59, 59, 999)
-      where.date = { gte: startDate, lte: endDate }
+      query = query.gte('date', startDate.toISOString()).lte('date', endDate.toISOString())
     }
-    if (category) where.category = category
+    if (category) {
+      query = query.eq('category', category)
+    }
 
-    // Fetch transactions
-    const transactions = await prisma.stockTransaction.findMany({
-      where,
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    })
+    const { data: transactions, error } = await query
+    if (error) throw error
 
     // Calculate summary
     const summary = await calculateStockSummary()
@@ -101,12 +108,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if table exists first
-    try {
-      await prisma.stockTransaction.findFirst({ take: 1 })
-    } catch (tableError) {
+    const { error: tableCheckError } = await supabase
+      .from('StockTransaction')
+      .select('id')
+      .limit(1)
+
+    if (tableCheckError && tableCheckError.code === '42P01') {
       return NextResponse.json({
         success: false,
-        message: 'Database migration pending. Please run: npx prisma migrate deploy in your production environment.'
+        message: 'Database migration pending. StockTransaction table not found.'
       }, { status: 503 })
     }
 
@@ -176,32 +186,39 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
   const freeDEFRunningTotal = freeDEFStock + totalLitersProduced
 
-  // Create transactions in a transaction block
+  // Create both transactions
   // Note: Finished Goods = Free DEF, so we don't create separate FINISHED_GOODS transaction
-  const transactions = await prisma.$transaction([
-    prisma.stockTransaction.create({
-      data: {
-        date: data.date,
-        type: 'PRODUCE_BATCH',
-        category: 'UREA',
-        quantity: -totalUreaNeeded,
-        unit: 'KG',
-        description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (-${totalUreaNeeded}kg Urea)`,
-        runningTotal: ureaRunningTotal,
-      },
-    }),
-    prisma.stockTransaction.create({
-      data: {
-        date: data.date,
-        type: 'PRODUCE_BATCH',
-        category: 'FREE_DEF',
-        quantity: totalLitersProduced,
-        unit: 'LITERS',
-        description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (+${totalLitersProduced}L Free DEF)`,
-        runningTotal: freeDEFRunningTotal,
-      },
-    }),
-  ])
+  const { data: ureaTransaction, error: ureaError } = await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
+      type: 'PRODUCE_BATCH',
+      category: 'UREA',
+      quantity: -totalUreaNeeded,
+      unit: 'KG',
+      description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (-${totalUreaNeeded}kg Urea)`,
+      runningTotal: ureaRunningTotal,
+    })
+    .select()
+    .single()
+  if (ureaError) throw ureaError
+
+  const { data: freeDEFTransaction, error: freeDEFError } = await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
+      type: 'PRODUCE_BATCH',
+      category: 'FREE_DEF',
+      quantity: totalLitersProduced,
+      unit: 'LITERS',
+      description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (+${totalLitersProduced}L Free DEF)`,
+      runningTotal: freeDEFRunningTotal,
+    })
+    .select()
+    .single()
+  if (freeDEFError) throw freeDEFError
+
+  const transactions = [ureaTransaction, freeDEFTransaction]
 
   return NextResponse.json({
     success: true,
@@ -230,17 +247,20 @@ async function handleFillBuckets(data: z.infer<typeof createStockSchema>) {
   // Subtract from Free DEF only (Finished Goods stays same)
   const newRunningTotal = freeDEFStock - litersNeeded
 
-  const transaction = await prisma.stockTransaction.create({
-    data: {
-      date: data.date,
+  const { data: transaction, error } = await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
       type: 'FILL_BUCKETS',
       category: 'FREE_DEF',
       quantity: -litersNeeded,
       unit: 'LITERS',
       description: data.description || `Filled buckets: -${litersNeeded}L`,
       runningTotal: newRunningTotal,
-    },
-  })
+    })
+    .select()
+    .single()
+  if (error) throw error
 
   return NextResponse.json({
     success: true,
@@ -267,17 +287,20 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
 
   const newRunningTotal = freeDEFStock - litersToSubtract
 
-  const transaction = await prisma.stockTransaction.create({
-    data: {
-      date: data.date,
+  const { data: transaction, error } = await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
       type: 'SELL_BUCKETS',
       category: 'FREE_DEF',
       quantity: -litersToSubtract,
       unit: 'LITERS',
       description: data.description || `Sold buckets: -${litersToSubtract}L`,
       runningTotal: newRunningTotal,
-    },
-  })
+    })
+    .select()
+    .single()
+  if (error) throw error
 
   return NextResponse.json({
     success: true,
@@ -309,52 +332,60 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
   // For SELL_FREE_DEF, also create InventoryTransaction
   // Note: Finished Goods = Free DEF, so we don't create separate FINISHED_GOODS transaction
   if (data.type === 'SELL_FREE_DEF') {
-    const transactions = await prisma.$transaction([
-      // StockTransaction for FREE_DEF
-      prisma.stockTransaction.create({
-        data: {
-          date: data.date,
-          type: data.type,
-          category: data.category,
-          quantity: data.quantity,
-          unit: data.unit,
-          description: data.description,
-          runningTotal: newRunningTotal,
-        },
-      }),
-      // InventoryTransaction for display in Inventory page
-      // Running total should match the Free DEF stock balance (same as StockBoard)
-      prisma.inventoryTransaction.create({
-        data: {
-          date: data.date,
-          warehouse: 'FACTORY',
-          bucketType: 'FREE_DEF',
-          action: 'SELL',
-          quantity: data.quantity, // Store as negative for sell
-          buyerSeller: data.description?.split(' to ').pop()?.trim() || 'Customer',
-          runningTotal: newRunningTotal, // Use Free DEF stock balance
-        },
-      }),
-    ])
+    // StockTransaction for FREE_DEF
+    const { data: stockTransaction, error: stockError } = await supabase
+      .from('StockTransaction')
+      .insert({
+        date: data.date.toISOString(),
+        type: data.type,
+        category: data.category,
+        quantity: data.quantity,
+        unit: data.unit,
+        description: data.description,
+        runningTotal: newRunningTotal,
+      })
+      .select()
+      .single()
+    if (stockError) throw stockError
+
+    // InventoryTransaction for display in Inventory page
+    // Running total should match the Free DEF stock balance (same as StockBoard)
+    const { data: inventoryTransaction, error: inventoryError } = await supabase
+      .from('InventoryTransaction')
+      .insert({
+        date: data.date.toISOString(),
+        warehouse: 'FACTORY',
+        bucketType: 'FREE_DEF',
+        action: 'SELL',
+        quantity: data.quantity, // Store as negative for sell
+        buyerSeller: data.description?.split(' to ').pop()?.trim() || 'Customer',
+        runningTotal: newRunningTotal, // Use Free DEF stock balance
+      })
+      .select()
+      .single()
+    if (inventoryError) throw inventoryError
 
     return NextResponse.json({
       success: true,
-      transactions,
+      transactions: [stockTransaction, inventoryTransaction],
     })
   }
 
   // Regular transaction (ADD_UREA)
-  const transaction = await prisma.stockTransaction.create({
-    data: {
-      date: data.date,
+  const { data: transaction, error } = await supabase
+    .from('StockTransaction')
+    .insert({
+      date: data.date.toISOString(),
       type: data.type,
       category: data.category,
       quantity: data.quantity,
       unit: data.unit,
       description: data.description,
       runningTotal: newRunningTotal,
-    },
-  })
+    })
+    .select()
+    .single()
+  if (error) throw error
 
   return NextResponse.json({
     success: true,
@@ -364,11 +395,16 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
 
 // Helper function to get current stock for a category
 async function getCurrentStock(category: StockCategory): Promise<number> {
-  const lastTransaction = await prisma.stockTransaction.findFirst({
-    where: { category },
-    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    select: { runningTotal: true },
-  })
+  const { data: lastTransaction, error } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', category)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error
 
   return lastTransaction?.runningTotal || 0
 }
@@ -404,17 +440,27 @@ async function calculateBucketsInLiters(): Promise<number> {
     if (bucketSize === 0) continue // Skip IBC_TANK
 
     // Get latest running total for each warehouse
-    const pallavi = await prisma.inventoryTransaction.findFirst({
-      where: { bucketType, warehouse: 'PALLAVI' },
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      select: { runningTotal: true },
-    })
+    const { data: pallavi, error: pallaviError } = await supabase
+      .from('InventoryTransaction')
+      .select('runningTotal')
+      .eq('bucketType', bucketType)
+      .eq('warehouse', 'PALLAVI')
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single()
+    if (pallaviError && pallaviError.code !== 'PGRST116') throw pallaviError
 
-    const tularam = await prisma.inventoryTransaction.findFirst({
-      where: { bucketType, warehouse: 'TULARAM' },
-      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      select: { runningTotal: true },
-    })
+    const { data: tularam, error: tularamError } = await supabase
+      .from('InventoryTransaction')
+      .select('runningTotal')
+      .eq('bucketType', bucketType)
+      .eq('warehouse', 'TULARAM')
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single()
+    if (tularamError && tularamError.code !== 'PGRST116') throw tularamError
 
     const pallaviStock = pallavi?.runningTotal || 0
     const tularamStock = tularam?.runningTotal || 0
