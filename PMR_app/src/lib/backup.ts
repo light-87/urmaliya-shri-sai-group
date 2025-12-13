@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { uploadBackupToDrive } from '@/lib/google-drive'
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
@@ -27,34 +27,45 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
 
   try {
     // Fetch all inventory transactions
-    const inventoryTransactions = await prisma.inventoryTransaction.findMany({
-      orderBy: { date: 'asc' },
-    })
-    inventoryCount = inventoryTransactions.length
+    const { data: inventoryTransactions, error: inventoryError } = await supabase
+      .from('InventoryTransaction')
+      .select('*')
+      .order('date', { ascending: true })
+
+    if (inventoryError) throw inventoryError
+    inventoryCount = inventoryTransactions?.length || 0
 
     // Fetch all expense transactions
-    const expenseTransactions = await prisma.expenseTransaction.findMany({
-      orderBy: { date: 'asc' },
-    })
-    expenseCount = expenseTransactions.length
+    const { data: expenseTransactions, error: expenseError } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .order('date', { ascending: true })
+
+    if (expenseError) throw expenseError
+    expenseCount = expenseTransactions?.length || 0
 
     // Fetch all stock transactions (if table exists)
     let stockTransactions: Array<{
       id: string
-      date: Date
+      date: string
       type: string
       category: string
       quantity: number
       unit: string
       description: string | null
       runningTotal: number
-      createdAt: Date
+      createdAt: string
     }> = []
     try {
-      stockTransactions = await prisma.stockTransaction.findMany({
-        orderBy: { date: 'asc' },
-      })
-      stockCount = stockTransactions.length
+      const { data, error } = await supabase
+        .from('StockTransaction')
+        .select('*')
+        .order('date', { ascending: true })
+
+      if (!error && data) {
+        stockTransactions = data
+        stockCount = data.length
+      }
     } catch (stockError) {
       console.log('Stock tracking not available yet in backup')
     }
@@ -67,19 +78,24 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       company: string | null
       status: string
       priority: string
-      lastCallDate: Date | null
-      nextFollowUpDate: Date | null
+      lastCallDate: string | null
+      nextFollowUpDate: string | null
       callOutcome: string | null
       quickNote: string | null
       additionalNotes: string | null
-      createdAt: Date
-      updatedAt: Date
+      createdAt: string
+      updatedAt: string
     }> = []
     try {
-      leads = await prisma.lead.findMany({
-        orderBy: { createdAt: 'asc' },
-      })
-      leadsCount = leads.length
+      const { data, error } = await supabase
+        .from('Lead')
+        .select('*')
+        .order('createdAt', { ascending: true })
+
+      if (!error && data) {
+        leads = data
+        leadsCount = data.length
+      }
     } catch (leadsError) {
       console.log('Leads not available yet in backup')
     }
@@ -89,13 +105,18 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       id: string
       pinNumber: string
       role: string
-      createdAt: Date
-      updatedAt: Date
+      createdAt: string
+      updatedAt: string
     }> = []
     try {
-      pins = await prisma.pin.findMany({
-        orderBy: { createdAt: 'asc' },
-      })
+      const { data, error } = await supabase
+        .from('Pin')
+        .select('*')
+        .order('createdAt', { ascending: true })
+
+      if (!error && data) {
+        pins = data
+      }
     } catch (pinError) {
       console.log('Pins not available in backup')
     }
@@ -105,12 +126,17 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       id: string
       key: string
       value: string
-      updatedAt: Date
+      updatedAt: string
     }> = []
     try {
-      systemSettings = await prisma.systemSettings.findMany({
-        orderBy: { key: 'asc' },
-      })
+      const { data, error } = await supabase
+        .from('SystemSettings')
+        .select('*')
+        .order('key', { ascending: true })
+
+      if (!error && data) {
+        systemSettings = data
+      }
     } catch (settingsError) {
       console.log('SystemSettings not available in backup')
     }
@@ -119,7 +145,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const workbook = XLSX.utils.book_new()
 
     // Create Inventory sheet
-    const inventoryData = inventoryTransactions.map((tx: any) => ({
+    const inventoryData = (inventoryTransactions || []).map((tx: any) => ({
       ID: tx.id,
       Date: format(new Date(tx.date), 'yyyy-MM-dd'),
       Warehouse: tx.warehouse,
@@ -134,7 +160,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     XLSX.utils.book_append_sheet(workbook, inventorySheet, 'Inventory')
 
     // Create Expenses sheet
-    const expenseData = expenseTransactions.map((tx: any) => ({
+    const expenseData = (expenseTransactions || []).map((tx: any) => ({
       ID: tx.id,
       Date: format(new Date(tx.date), 'yyyy-MM-dd'),
       Amount: Number(tx.amount),
@@ -224,8 +250,9 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const driveFileId = await uploadBackupToDrive(buffer, fileName)
 
     // Log successful backup
-    const backupLog = await prisma.backupLog.create({
-      data: {
+    const { data: backupLog, error: logError } = await supabase
+      .from('BackupLog')
+      .insert({
         backupType: type,
         driveFileId,
         inventoryCount,
@@ -233,12 +260,15 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
         stockCount,
         leadsCount,
         status: 'SUCCESS',
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (logError) throw logError
 
     return {
       success: true,
-      backupId: backupLog.id,
+      backupId: backupLog?.id,
       driveFileId,
       inventoryCount,
       expenseCount,
@@ -249,16 +279,14 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
     // Log failed backup
-    await prisma.backupLog.create({
-      data: {
-        backupType: type,
-        inventoryCount,
-        expenseCount,
-        stockCount,
-        leadsCount,
-        status: 'FAILED',
-        errorMessage,
-      },
+    await supabase.from('BackupLog').insert({
+      backupType: type,
+      inventoryCount,
+      expenseCount,
+      stockCount,
+      leadsCount,
+      status: 'FAILED',
+      errorMessage,
     })
 
     return {
@@ -276,13 +304,17 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
  * Get the last successful backup date
  */
 export async function getLastBackupDate(): Promise<Date | null> {
-  const lastBackup = await prisma.backupLog.findFirst({
-    where: { status: 'SUCCESS' },
-    orderBy: { backupDate: 'desc' },
-    select: { backupDate: true },
-  })
+  const { data: lastBackup, error } = await supabase
+    .from('BackupLog')
+    .select('backupDate')
+    .eq('status', 'SUCCESS')
+    .order('backupDate', { ascending: false })
+    .limit(1)
+    .single()
 
-  return lastBackup?.backupDate || null
+  if (error || !lastBackup) return null
+
+  return lastBackup.backupDate ? new Date(lastBackup.backupDate) : null
 }
 
 /**
@@ -304,10 +336,14 @@ export async function isBackupNeeded(): Promise<boolean> {
  * Get recent backup logs
  */
 export async function getBackupLogs(limit: number = 20) {
-  return prisma.backupLog.findMany({
-    orderBy: { backupDate: 'desc' },
-    take: limit,
-  })
+  const { data, error } = await supabase
+    .from('BackupLog')
+    .select('*')
+    .order('backupDate', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data || []
 }
 
 /**

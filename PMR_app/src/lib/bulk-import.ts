@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { ParsedExcelData, InventoryRow, ExpenseRow } from '@/lib/excel-parser'
 import { BucketType, Warehouse } from '@/types'
 
@@ -22,13 +22,19 @@ async function getCurrentStock(
   bucketType: BucketType,
   warehouse: Warehouse
 ): Promise<number> {
-  const lastTransaction = await prisma.inventoryTransaction.findFirst({
-    where: { bucketType, warehouse },
-    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-    select: { runningTotal: true },
-  })
+  const { data: lastTransaction, error } = await supabase
+    .from('InventoryTransaction')
+    .select('runningTotal')
+    .eq('bucketType', bucketType)
+    .eq('warehouse', warehouse)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
 
-  return lastTransaction?.runningTotal || 0
+  if (error || !lastTransaction) return 0
+
+  return lastTransaction.runningTotal || 0
 }
 
 /**
@@ -73,7 +79,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
         // Add to batch
         inventoryTransactions.push({
-          date: row.Date,
+          date: row.Date.toISOString(),
           warehouse: row.Warehouse,
           bucketType: row.BucketType,
           action: row.Action,
@@ -95,10 +101,11 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
     // Batch insert all inventory transactions at once
     if (inventoryTransactions.length > 0) {
-      await prisma.inventoryTransaction.createMany({
-        data: inventoryTransactions,
-        skipDuplicates: false,
-      })
+      const { error } = await supabase
+        .from('InventoryTransaction')
+        .insert(inventoryTransactions)
+
+      if (error) throw error
       inventoryImported = inventoryTransactions.length
     }
 
@@ -115,7 +122,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
       try {
         expenseTransactions.push({
-          date: row.Date,
+          date: row.Date.toISOString(),
           amount: row.Amount,
           account: row.Account,
           type: row.Type,
@@ -132,10 +139,11 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
     // Batch insert all expense transactions at once
     if (expenseTransactions.length > 0) {
-      await prisma.expenseTransaction.createMany({
-        data: expenseTransactions,
-        skipDuplicates: false,
-      })
+      const { error } = await supabase
+        .from('ExpenseTransaction')
+        .insert(expenseTransactions)
+
+      if (error) throw error
       expensesImported = expenseTransactions.length
     }
 
