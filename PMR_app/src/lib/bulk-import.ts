@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { ParsedExcelData, InventoryRow, ExpenseRow } from '@/lib/excel-parser'
 import { BucketType, Warehouse } from '@/types'
+import { randomUUID } from 'crypto'
 
 export interface ImportError {
   type: 'inventory' | 'expense'
@@ -79,6 +80,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
         // Add to batch
         inventoryTransactions.push({
+          id: randomUUID(),
           date: row.Date.toISOString(),
           warehouse: row.Warehouse,
           bucketType: row.BucketType,
@@ -122,6 +124,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
       try {
         expenseTransactions.push({
+          id: randomUUID(),
           date: row.Date.toISOString(),
           amount: row.Amount,
           account: row.Account,

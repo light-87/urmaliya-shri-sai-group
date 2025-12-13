@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
     // This allows recovery from accidental factory reset
     if (lastBackup) {
       await supabase.from('BackupLog').insert({
+        id: randomUUID(),
         backupType: lastBackup.backupType,
         driveFileId: lastBackup.driveFileId,
         inventoryCount: lastBackup.inventoryCount,

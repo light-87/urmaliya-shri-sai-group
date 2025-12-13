@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import type { BucketType, Warehouse, ActionType } from '@/types'
 import { BUCKET_SIZES } from '@/types'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
     const { data: transaction, error: createError } = await supabase
       .from('InventoryTransaction')
       .insert({
+        id: randomUUID(),
         date: validatedData.date.toISOString(),
         warehouse: validatedData.warehouse,
         bucketType: validatedData.bucketType,
@@ -283,6 +285,7 @@ async function createStockTransaction(data: {
   await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: data.type,
       category: data.category,

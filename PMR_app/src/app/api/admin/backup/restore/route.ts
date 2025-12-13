@@ -4,6 +4,7 @@ import { downloadBackupFromDrive } from '@/lib/google-drive'
 import { createBackup } from '@/lib/backup'
 import { supabase } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
+import { randomUUID } from 'crypto'
 import {
   Warehouse,
   BucketType,
@@ -232,6 +233,7 @@ export async function POST(request: NextRequest) {
           const { error } = await supabase
             .from('InventoryTransaction')
             .insert({
+          id: randomUUID(),
               date: parseBackupDate(row.Date).toISOString(),
               warehouse: row.Warehouse,
               bucketType: row['Bucket Type'],
@@ -260,6 +262,7 @@ export async function POST(request: NextRequest) {
           const { error } = await supabase
             .from('ExpenseTransaction')
             .insert({
+          id: randomUUID(),
               date: parseBackupDate(row.Date).toISOString(),
               amount: Number(row.Amount),
               account: row.Account,
@@ -287,6 +290,7 @@ export async function POST(request: NextRequest) {
             const { error } = await supabase
               .from('StockTransaction')
               .insert({
+          id: randomUUID(),
                 date: parseBackupDate(row.Date).toISOString(),
                 type: row.Type,
                 category: row.Category,
@@ -311,6 +315,7 @@ export async function POST(request: NextRequest) {
             const { error } = await supabase
               .from('Lead')
               .insert({
+          id: randomUUID(),
                 name: row.Name || 'Unknown',
                 phone: row.Phone || '',
                 company: row.Company || null,
@@ -338,6 +343,7 @@ export async function POST(request: NextRequest) {
             const { error } = await supabase
               .from('Pin')
               .insert({
+          id: randomUUID(),
                 pinNumber: row['PIN Number'] || '',
                 role: row.Role || 'INVENTORY_ONLY',
               })
@@ -357,6 +363,7 @@ export async function POST(request: NextRequest) {
             const { error } = await supabase
               .from('SystemSettings')
               .insert({
+          id: randomUUID(),
                 key: row.Key || '',
                 value: row.Value || '',
               })
@@ -373,6 +380,7 @@ export async function POST(request: NextRequest) {
 
       // Create a log entry for the restore operation
       await supabase.from('BackupLog').insert({
+          id: randomUUID(),
         backupType: 'MANUAL',
         driveFileId: driveFileId,
         inventoryCount: inventoryRestored,
@@ -398,6 +406,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // If restore fails, log the failure
       await supabase.from('BackupLog').insert({
+          id: randomUUID(),
         backupType: 'MANUAL',
         driveFileId: driveFileId,
         inventoryCount: inventoryRestored,

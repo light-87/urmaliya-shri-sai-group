@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { LeadStatus, Priority, CallOutcome } from '@/types'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
     const { data: lead, error } = await supabase
       .from('Lead')
       .insert({
+        id: randomUUID(),
         name: validatedData.name,
         phone: validatedData.phone,
         company: validatedData.company,

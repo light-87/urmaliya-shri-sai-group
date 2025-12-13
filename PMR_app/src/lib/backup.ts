@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { uploadBackupToDrive } from '@/lib/google-drive'
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
+import { randomUUID } from 'crypto'
 
 export type BackupType = 'MANUAL' | 'AUTOMATIC'
 
@@ -253,6 +254,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const { data: backupLog, error: logError } = await supabase
       .from('BackupLog')
       .insert({
+        id: randomUUID(),
         backupType: type,
         driveFileId,
         inventoryCount,
@@ -280,6 +282,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
 
     // Log failed backup
     await supabase.from('BackupLog').insert({
+        id: randomUUID(),
       backupType: type,
       inventoryCount,
       expenseCount,

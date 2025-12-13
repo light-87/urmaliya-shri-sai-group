@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { ExpenseAccount, TransactionType } from '@/types'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
     const { data: transaction, error } = await supabase
       .from('ExpenseTransaction')
       .insert({
+        id: randomUUID(),
         date: validatedData.date.toISOString(),
         amount: validatedData.amount,
         account: validatedData.account,
