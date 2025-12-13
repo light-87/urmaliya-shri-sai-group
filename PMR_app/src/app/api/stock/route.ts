@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { StockTransactionType, StockCategory, StockUnit, BucketType } from '@/types'
 import { BUCKET_SIZES, UREA_PER_BATCH_KG, LITERS_PER_BATCH } from '@/types'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,6 +192,7 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   const { data: ureaTransaction, error: ureaError } = await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: 'PRODUCE_BATCH',
       category: 'UREA',
@@ -206,6 +208,7 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   const { data: freeDEFTransaction, error: freeDEFError } = await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: 'PRODUCE_BATCH',
       category: 'FREE_DEF',
@@ -250,6 +253,7 @@ async function handleFillBuckets(data: z.infer<typeof createStockSchema>) {
   const { data: transaction, error } = await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: 'FILL_BUCKETS',
       category: 'FREE_DEF',
@@ -290,6 +294,7 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
   const { data: transaction, error } = await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: 'SELL_BUCKETS',
       category: 'FREE_DEF',
@@ -336,6 +341,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
     const { data: stockTransaction, error: stockError } = await supabase
       .from('StockTransaction')
       .insert({
+        id: randomUUID(),
         date: data.date.toISOString(),
         type: data.type,
         category: data.category,
@@ -353,6 +359,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
     const { data: inventoryTransaction, error: inventoryError } = await supabase
       .from('InventoryTransaction')
       .insert({
+        id: randomUUID(),
         date: data.date.toISOString(),
         warehouse: 'FACTORY',
         bucketType: 'FREE_DEF',
@@ -375,6 +382,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
   const { data: transaction, error } = await supabase
     .from('StockTransaction')
     .insert({
+      id: randomUUID(),
       date: data.date.toISOString(),
       type: data.type,
       category: data.category,
