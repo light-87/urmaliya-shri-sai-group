@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Warehouse, BucketType, ActionType, ExpenseAccount, TransactionType } from '@prisma/client'
+import { Warehouse, BucketType, ActionType, ExpenseAccount, TransactionType } from '@/types'
 
 // Helper function to parse dates in various formats
 function parseDate(val: string): Date {
