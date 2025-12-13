@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "BackupLog" ADD COLUMN "leadsCount" INTEGER NOT NULL DEFAULT 0;

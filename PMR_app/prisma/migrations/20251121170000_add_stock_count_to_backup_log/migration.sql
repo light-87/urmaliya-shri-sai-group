@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "BackupLog" ADD COLUMN "stockCount" INTEGER NOT NULL DEFAULT 0;
