@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySession } from '@/lib/auth'
 import { listBackupsFromDrive } from '@/lib/google-drive'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,18 +24,19 @@ export async function GET(request: NextRequest) {
     const driveFiles = await listBackupsFromDrive(limit)
 
     // Get backup logs from database to add metadata
-    const backupLogs = await prisma.backupLog.findMany({
-      where: {
-        status: 'SUCCESS',
-        driveFileId: { not: null },
-      },
-      orderBy: { backupDate: 'desc' },
-      take: limit,
-    })
+    const { data: backupLogs, error } = await supabase
+      .from('BackupLog')
+      .select('*')
+      .eq('status', 'SUCCESS')
+      .not('driveFileId', 'is', null)
+      .order('backupDate', { ascending: false })
+      .limit(limit)
+
+    if (error) throw error
 
     // Merge drive files with backup logs
     const backupsWithMetadata = driveFiles.map((file) => {
-      const log = backupLogs.find((backupLog: any) => backupLog.driveFileId === file.id)
+      const log = backupLogs?.find((backupLog: any) => backupLog.driveFileId === file.id)
 
       return {
         id: file.id,

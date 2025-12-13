@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySession } from '@/lib/auth'
 import { downloadBackupFromDrive } from '@/lib/google-drive'
 import { createBackup } from '@/lib/backup'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import {
   Warehouse,
@@ -154,22 +154,48 @@ export async function POST(request: NextRequest) {
     // Step 4: Delete all current data
     console.log('Step 4: Deleting all current data...')
     try {
-      const deletedInventory = await prisma.inventoryTransaction.deleteMany({})
-      const deletedExpenses = await prisma.expenseTransaction.deleteMany({})
-      const deletedStock = await prisma.stockTransaction.deleteMany({})
-      const deletedLeads = await prisma.lead.deleteMany({})
+      // Get counts before deletion
+      const { count: inventoryCount } = await supabase
+        .from('InventoryTransaction')
+        .select('*', { count: 'exact', head: true })
+
+      const { count: expenseCount } = await supabase
+        .from('ExpenseTransaction')
+        .select('*', { count: 'exact', head: true })
+
+      const { count: stockCount } = await supabase
+        .from('StockTransaction')
+        .select('*', { count: 'exact', head: true })
+
+      const { count: leadsCount } = await supabase
+        .from('Lead')
+        .select('*', { count: 'exact', head: true })
+
+      // Delete all data
+      await supabase.from('InventoryTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('ExpenseTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('StockTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('Lead').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
       // Only delete pins and settings if backup contains them (to preserve auth on older backups)
-      let deletedPins = { count: 0 }
-      let deletedSettings = { count: 0 }
+      let pinsCount = 0
+      let settingsCount = 0
       if (pinsData.length > 0) {
-        deletedPins = await prisma.pin.deleteMany({})
+        const { count } = await supabase
+          .from('Pin')
+          .select('*', { count: 'exact', head: true })
+        pinsCount = count || 0
+        await supabase.from('Pin').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       }
       if (settingsData.length > 0) {
-        deletedSettings = await prisma.systemSettings.deleteMany({})
+        const { count } = await supabase
+          .from('SystemSettings')
+          .select('*', { count: 'exact', head: true })
+        settingsCount = count || 0
+        await supabase.from('SystemSettings').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       }
 
-      console.log(`Deleted ${deletedInventory.count} inventory, ${deletedExpenses.count} expense, ${deletedStock.count} stock, ${deletedLeads.count} leads, ${deletedPins.count} pins, ${deletedSettings.count} settings records`)
+      console.log(`Deleted ${inventoryCount || 0} inventory, ${expenseCount || 0} expense, ${stockCount || 0} stock, ${leadsCount || 0} leads, ${pinsCount} pins, ${settingsCount} settings records`)
     } catch (error) {
       return NextResponse.json(
         {
@@ -203,17 +229,19 @@ export async function POST(request: NextRequest) {
       for (const row of sortedInventory) {
         try {
           // Use the running total from the backup directly
-          await prisma.inventoryTransaction.create({
-            data: {
-              date: parseBackupDate(row.Date),
-              warehouse: row.Warehouse as any,
-              bucketType: row['Bucket Type'] as any,
-              action: row.Action as any,
+          const { error } = await supabase
+            .from('InventoryTransaction')
+            .insert({
+              date: parseBackupDate(row.Date).toISOString(),
+              warehouse: row.Warehouse,
+              bucketType: row['Bucket Type'],
+              action: row.Action,
               quantity: Number(row.Quantity),
               buyerSeller: row['Buyer/Seller'] || 'N/A',
               runningTotal: Number(row['Running Total']),
-            },
-          })
+            })
+
+          if (error) throw error
           inventoryRestored++
         } catch (error) {
           errors.push(`Inventory row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -229,15 +257,17 @@ export async function POST(request: NextRequest) {
 
       for (const row of sortedExpenses) {
         try {
-          await prisma.expenseTransaction.create({
-            data: {
-              date: parseBackupDate(row.Date),
+          const { error } = await supabase
+            .from('ExpenseTransaction')
+            .insert({
+              date: parseBackupDate(row.Date).toISOString(),
               amount: Number(row.Amount),
-              account: row.Account as any,
-              type: row.Type as any,
+              account: row.Account,
+              type: row.Type,
               name: row.Name || 'N/A',
-            },
-          })
+            })
+
+          if (error) throw error
           expensesRestored++
         } catch (error) {
           errors.push(`Expense row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -254,17 +284,19 @@ export async function POST(request: NextRequest) {
 
         for (const row of sortedStock) {
           try {
-            await prisma.stockTransaction.create({
-              data: {
-                date: parseBackupDate(row.Date),
-                type: row.Type as any,
-                category: row.Category as any,
+            const { error } = await supabase
+              .from('StockTransaction')
+              .insert({
+                date: parseBackupDate(row.Date).toISOString(),
+                type: row.Type,
+                category: row.Category,
                 quantity: Number(row.Quantity),
-                unit: row.Unit as any,
+                unit: row.Unit,
                 description: row.Description || null,
                 runningTotal: Number(row['Running Total']),
-              },
-            })
+              })
+
+            if (error) throw error
             stockRestored++
           } catch (error) {
             errors.push(`Stock row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -276,20 +308,22 @@ export async function POST(request: NextRequest) {
       if (leadsData.length > 0) {
         for (const row of leadsData) {
           try {
-            await prisma.lead.create({
-              data: {
+            const { error } = await supabase
+              .from('Lead')
+              .insert({
                 name: row.Name || 'Unknown',
                 phone: row.Phone || '',
                 company: row.Company || null,
-                status: (row.Status as any) || 'NEW',
-                priority: (row.Priority as any) || 'MEDIUM',
-                lastCallDate: row['Last Call Date'] ? parseBackupDate(row['Last Call Date']) : null,
-                nextFollowUpDate: row['Next Follow-Up'] ? parseBackupDate(row['Next Follow-Up']) : null,
-                callOutcome: row['Call Outcome'] ? (row['Call Outcome'] as any) : null,
+                status: row.Status || 'NEW',
+                priority: row.Priority || 'MEDIUM',
+                lastCallDate: row['Last Call Date'] ? parseBackupDate(row['Last Call Date']).toISOString() : null,
+                nextFollowUpDate: row['Next Follow-Up'] ? parseBackupDate(row['Next Follow-Up']).toISOString() : null,
+                callOutcome: row['Call Outcome'] || null,
                 quickNote: row['Quick Note'] || null,
                 additionalNotes: row['Additional Notes'] || null,
-              },
-            })
+              })
+
+            if (error) throw error
             leadsRestored++
           } catch (error) {
             errors.push(`Lead row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -301,12 +335,14 @@ export async function POST(request: NextRequest) {
       if (pinsData.length > 0) {
         for (const row of pinsData) {
           try {
-            await prisma.pin.create({
-              data: {
+            const { error } = await supabase
+              .from('Pin')
+              .insert({
                 pinNumber: row['PIN Number'] || '',
-                role: (row.Role as any) || 'INVENTORY_ONLY',
-              },
-            })
+                role: row.Role || 'INVENTORY_ONLY',
+              })
+
+            if (error) throw error
             pinsRestored++
           } catch (error) {
             errors.push(`Pin row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -318,12 +354,14 @@ export async function POST(request: NextRequest) {
       if (settingsData.length > 0) {
         for (const row of settingsData) {
           try {
-            await prisma.systemSettings.create({
-              data: {
+            const { error } = await supabase
+              .from('SystemSettings')
+              .insert({
                 key: row.Key || '',
                 value: row.Value || '',
-              },
-            })
+              })
+
+            if (error) throw error
             settingsRestored++
           } catch (error) {
             errors.push(`Settings row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -334,17 +372,15 @@ export async function POST(request: NextRequest) {
       console.log(`Restored ${inventoryRestored} inventory, ${expensesRestored} expense, ${stockRestored} stock, ${leadsRestored} leads, ${pinsRestored} pins, ${settingsRestored} settings records`)
 
       // Create a log entry for the restore operation
-      await prisma.backupLog.create({
-        data: {
-          backupType: 'MANUAL',
-          driveFileId: driveFileId,
-          inventoryCount: inventoryRestored,
-          expenseCount: expensesRestored,
-          stockCount: stockRestored,
-          leadsCount: leadsRestored,
-          status: 'SUCCESS',
-          errorMessage: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
-        },
+      await supabase.from('BackupLog').insert({
+        backupType: 'MANUAL',
+        driveFileId: driveFileId,
+        inventoryCount: inventoryRestored,
+        expenseCount: expensesRestored,
+        stockCount: stockRestored,
+        leadsCount: leadsRestored,
+        status: 'SUCCESS',
+        errorMessage: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
       })
 
       return NextResponse.json({
@@ -361,17 +397,15 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       // If restore fails, log the failure
-      await prisma.backupLog.create({
-        data: {
-          backupType: 'MANUAL',
-          driveFileId: driveFileId,
-          inventoryCount: inventoryRestored,
-          expenseCount: expensesRestored,
-          stockCount: stockRestored,
-          leadsCount: leadsRestored,
-          status: 'FAILED',
-          errorMessage: error instanceof Error ? error.message : 'Unknown error during restore',
-        },
+      await supabase.from('BackupLog').insert({
+        backupType: 'MANUAL',
+        driveFileId: driveFileId,
+        inventoryCount: inventoryRestored,
+        expenseCount: expensesRestored,
+        stockCount: stockRestored,
+        leadsCount: leadsRestored,
+        status: 'FAILED',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error during restore',
       })
 
       return NextResponse.json(

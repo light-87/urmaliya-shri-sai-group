@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { PinRole } from '@/types'
@@ -24,17 +24,15 @@ export async function GET() {
       )
     }
 
-    const pins = await prisma.pin.findMany({
-      select: {
-        id: true,
-        role: true,
-        // Don't expose actual PIN for security
-      },
-    })
+    const { data: pins, error } = await supabase
+      .from('Pin')
+      .select('id, role')
+
+    if (error) throw error
 
     return NextResponse.json({
       success: true,
-      pins,
+      pins: pins || [],
     })
   } catch (error) {
     console.error('Pins GET error:', error)
@@ -83,9 +81,11 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check if PIN already exists for another role
-    const existingPin = await prisma.pin.findUnique({
-      where: { pinNumber: newPin },
-    })
+    const { data: existingPin, error: fetchError } = await supabase
+      .from('Pin')
+      .select('*')
+      .eq('pinNumber', newPin)
+      .single()
 
     if (existingPin && existingPin.role !== role) {
       return NextResponse.json(
@@ -94,11 +94,13 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Update the PIN
-    await prisma.pin.updateMany({
-      where: { role },
-      data: { pinNumber: newPin },
-    })
+    // Update the PIN for the role
+    const { error: updateError } = await supabase
+      .from('Pin')
+      .update({ pinNumber: newPin })
+      .eq('role', role)
+
+    if (updateError) throw updateError
 
     return NextResponse.json({
       success: true,

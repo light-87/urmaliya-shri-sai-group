@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,45 +47,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Count transactions that will be deleted
-    const inventoryCount = await prisma.inventoryTransaction.count({
-      where: {
-        createdAt: {
-          gte: cutoffDate,
-        },
-      },
-    })
+    const { count: inventoryCount } = await supabase
+      .from('InventoryTransaction')
+      .select('*', { count: 'exact', head: true })
+      .gte('createdAt', cutoffDate.toISOString())
 
-    const expenseCount = await prisma.expenseTransaction.count({
-      where: {
-        createdAt: {
-          gte: cutoffDate,
-        },
-      },
-    })
+    const { count: expenseCount } = await supabase
+      .from('ExpenseTransaction')
+      .select('*', { count: 'exact', head: true })
+      .gte('createdAt', cutoffDate.toISOString())
 
     // Delete the transactions
-    const [deletedInventory, deletedExpenses] = await prisma.$transaction([
-      prisma.inventoryTransaction.deleteMany({
-        where: {
-          createdAt: {
-            gte: cutoffDate,
-          },
-        },
-      }),
-      prisma.expenseTransaction.deleteMany({
-        where: {
-          createdAt: {
-            gte: cutoffDate,
-          },
-        },
-      }),
-    ])
+    const { error: inventoryError } = await supabase
+      .from('InventoryTransaction')
+      .delete()
+      .gte('createdAt', cutoffDate.toISOString())
+
+    if (inventoryError) throw inventoryError
+
+    const { error: expenseError } = await supabase
+      .from('ExpenseTransaction')
+      .delete()
+      .gte('createdAt', cutoffDate.toISOString())
+
+    if (expenseError) throw expenseError
 
     return NextResponse.json({
       success: true,
       message: 'Transactions deleted successfully',
-      inventoryDeleted: deletedInventory.count,
-      expensesDeleted: deletedExpenses.count,
+      inventoryDeleted: inventoryCount || 0,
+      expensesDeleted: expenseCount || 0,
     })
   } catch (error) {
     console.error('Delete transactions error:', error)
