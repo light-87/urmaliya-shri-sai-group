@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { LeadStatus, Priority, CallOutcome } from '@/types'
@@ -46,11 +46,13 @@ export async function PUT(
     const validatedData = updateLeadSchema.parse(body)
 
     // Check if lead exists
-    const existing = await prisma.lead.findUnique({
-      where: { id },
-    })
+    const { data: existing, error: fetchError } = await supabase
+      .from('Lead')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!existing) {
+    if (fetchError || !existing) {
       return NextResponse.json(
         { success: false, message: 'Lead not found' },
         { status: 404 }
@@ -58,25 +60,41 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: Record<string, unknown> = { ...validatedData }
+    const updateData: Record<string, unknown> = {}
+
+    if (validatedData.name !== undefined) updateData.name = validatedData.name
+    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone
+    if (validatedData.company !== undefined) updateData.company = validatedData.company
+    if (validatedData.status !== undefined) updateData.status = validatedData.status
+    if (validatedData.priority !== undefined) updateData.priority = validatedData.priority
+    if (validatedData.callOutcome !== undefined) updateData.callOutcome = validatedData.callOutcome
+    if (validatedData.quickNote !== undefined) updateData.quickNote = validatedData.quickNote
+    if (validatedData.additionalNotes !== undefined) updateData.additionalNotes = validatedData.additionalNotes
+    if (validatedData.nextFollowUpDate !== undefined) {
+      updateData.nextFollowUpDate = validatedData.nextFollowUpDate ? validatedData.nextFollowUpDate.toISOString() : null
+    }
 
     // Auto-set lastCallDate if status changed to CALLED
     if (validatedData.status === 'CALLED' && existing.status !== 'CALLED') {
-      updateData.lastCallDate = new Date()
+      updateData.lastCallDate = new Date().toISOString()
     }
 
     // Auto-set nextFollowUpDate if status changed to CALL_IN_7_DAYS and not manually set
     if (validatedData.status === 'CALL_IN_7_DAYS' && !validatedData.nextFollowUpDate) {
       const followUpDate = new Date()
       followUpDate.setDate(followUpDate.getDate() + 7)
-      updateData.nextFollowUpDate = followUpDate
+      updateData.nextFollowUpDate = followUpDate.toISOString()
     }
 
     // Update the lead
-    const lead = await prisma.lead.update({
-      where: { id },
-      data: updateData as any,
-    })
+    const { data: lead, error: updateError } = await supabase
+      .from('Lead')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
 
     return NextResponse.json({
       success: true,
@@ -122,11 +140,13 @@ export async function DELETE(
     const { id } = await params
 
     // Check if lead exists
-    const lead = await prisma.lead.findUnique({
-      where: { id },
-    })
+    const { data: lead, error: fetchError } = await supabase
+      .from('Lead')
+      .select('id')
+      .eq('id', id)
+      .single()
 
-    if (!lead) {
+    if (fetchError || !lead) {
       return NextResponse.json(
         { success: false, message: 'Lead not found' },
         { status: 404 }
@@ -134,9 +154,12 @@ export async function DELETE(
     }
 
     // Delete lead
-    await prisma.lead.delete({
-      where: { id },
-    })
+    const { error: deleteError } = await supabase
+      .from('Lead')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) throw deleteError
 
     return NextResponse.json({
       success: true,

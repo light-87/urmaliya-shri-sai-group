@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { ExpenseAccount, TransactionType } from '@/types'
@@ -42,22 +42,36 @@ export async function PUT(
     const validatedData = updateExpenseSchema.parse(body)
 
     // Check if transaction exists
-    const existing = await prisma.expenseTransaction.findUnique({
-      where: { id },
-    })
+    const { data: existing, error: fetchError } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!existing) {
+    if (fetchError || !existing) {
       return NextResponse.json(
         { success: false, message: 'Transaction not found' },
         { status: 404 }
       )
     }
 
+    // Prepare update data
+    const updateData: Record<string, any> = {}
+    if (validatedData.date) updateData.date = validatedData.date.toISOString()
+    if (validatedData.amount !== undefined) updateData.amount = validatedData.amount
+    if (validatedData.account) updateData.account = validatedData.account
+    if (validatedData.type) updateData.type = validatedData.type
+    if (validatedData.name) updateData.name = validatedData.name
+
     // Update the transaction
-    const transaction = await prisma.expenseTransaction.update({
-      where: { id },
-      data: validatedData as any,
-    })
+    const { data: transaction, error: updateError } = await supabase
+      .from('ExpenseTransaction')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
 
     return NextResponse.json({
       success: true,
@@ -103,11 +117,13 @@ export async function DELETE(
     const { id } = await params
 
     // Check if transaction exists
-    const transaction = await prisma.expenseTransaction.findUnique({
-      where: { id },
-    })
+    const { data: transaction, error: fetchError } = await supabase
+      .from('ExpenseTransaction')
+      .select('id')
+      .eq('id', id)
+      .single()
 
-    if (!transaction) {
+    if (fetchError || !transaction) {
       return NextResponse.json(
         { success: false, message: 'Transaction not found' },
         { status: 404 }
@@ -115,9 +131,12 @@ export async function DELETE(
     }
 
     // Delete transaction
-    await prisma.expenseTransaction.delete({
-      where: { id },
-    })
+    const { error: deleteError } = await supabase
+      .from('ExpenseTransaction')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) throw deleteError
 
     return NextResponse.json({
       success: true,

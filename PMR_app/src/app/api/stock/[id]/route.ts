@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { StockTransactionType, StockCategory, StockUnit } from '@/types'
@@ -43,39 +43,47 @@ export async function PUT(
     const validatedData = updateStockSchema.parse(body)
 
     // Get existing transaction
-    const existing = await prisma.stockTransaction.findUnique({
-      where: { id },
-    })
+    const { data: existing, error: fetchError } = await supabase
+      .from('StockTransaction')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!existing) {
+    if (fetchError || !existing) {
       return NextResponse.json(
         { success: false, message: 'Transaction not found' },
         { status: 404 }
       )
     }
 
-    // Merge with existing data
-    const updatedData = {
-      date: validatedData.date || existing.date,
-      type: validatedData.type || existing.type,
-      category: validatedData.category || existing.category,
-      quantity: validatedData.quantity !== undefined ? validatedData.quantity : existing.quantity,
-      unit: validatedData.unit || existing.unit,
-      description: validatedData.description !== undefined ? validatedData.description : existing.description,
-    }
+    // Prepare update payload
+    const updatePayload: Record<string, any> = {}
+    if (validatedData.date) updatePayload.date = validatedData.date.toISOString()
+    if (validatedData.type) updatePayload.type = validatedData.type
+    if (validatedData.category) updatePayload.category = validatedData.category
+    if (validatedData.quantity !== undefined) updatePayload.quantity = validatedData.quantity
+    if (validatedData.unit) updatePayload.unit = validatedData.unit
+    if (validatedData.description !== undefined) updatePayload.description = validatedData.description
 
     // Update the transaction
-    const transaction = await prisma.stockTransaction.update({
-      where: { id },
-      data: updatedData as any,
-    })
+    const { data: transaction, error: updateError } = await supabase
+      .from('StockTransaction')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
+
+    // Get the updated category (either from update or existing)
+    const updatedCategory = validatedData.category || existing.category
 
     // Recalculate running totals for this category
-    await recalculateRunningTotals(updatedData.category as any)
+    await recalculateRunningTotals(updatedCategory)
 
     // Also recalculate old category if changed
     if (validatedData.category && validatedData.category !== existing.category) {
-      await recalculateRunningTotals(existing.category as any)
+      await recalculateRunningTotals(existing.category)
     }
 
     return NextResponse.json({
@@ -122,11 +130,13 @@ export async function DELETE(
     const { id } = await params
 
     // Get transaction before deleting
-    const transaction = await prisma.stockTransaction.findUnique({
-      where: { id },
-    })
+    const { data: transaction, error: fetchError } = await supabase
+      .from('StockTransaction')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!transaction) {
+    if (fetchError || !transaction) {
       return NextResponse.json(
         { success: false, message: 'Transaction not found' },
         { status: 404 }
@@ -134,12 +144,15 @@ export async function DELETE(
     }
 
     // Delete transaction
-    await prisma.stockTransaction.delete({
-      where: { id },
-    })
+    const { error: deleteError } = await supabase
+      .from('StockTransaction')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) throw deleteError
 
     // Recalculate running totals
-    await recalculateRunningTotals(transaction.category as any)
+    await recalculateRunningTotals(transaction.category)
 
     return NextResponse.json({
       success: true,
@@ -157,18 +170,25 @@ export async function DELETE(
 // Helper function to recalculate all running totals for a category
 async function recalculateRunningTotals(category: StockCategory) {
   // Get all transactions for this category, ordered by date
-  const transactions = await prisma.stockTransaction.findMany({
-    where: { category },
-    orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
-  })
+  const { data: transactions, error } = await supabase
+    .from('StockTransaction')
+    .select('*')
+    .eq('category', category)
+    .order('date', { ascending: true })
+    .order('createdAt', { ascending: true })
+
+  if (error || !transactions) {
+    console.error('Failed to fetch transactions for recalculation:', error)
+    return
+  }
 
   // Recalculate running totals
   let runningTotal = 0
   for (const transaction of transactions) {
     runningTotal += transaction.quantity
-    await prisma.stockTransaction.update({
-      where: { id: transaction.id },
-      data: { runningTotal },
-    })
+    await supabase
+      .from('StockTransaction')
+      .update({ runningTotal })
+      .eq('id', transaction.id)
   }
 }
