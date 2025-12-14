@@ -440,38 +440,36 @@ async function calculateStockSummary() {
 
 // Calculate total liters in buckets from inventory
 async function calculateBucketsInLiters(): Promise<number> {
+  // OPTIMIZATION: Fetch all latest inventory transactions in a single query
+  const { data: allTransactions } = await supabase
+    .from('InventoryTransaction')
+    .select('bucketType, warehouse, runningTotal, date, createdAt')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+
+  // Build a map of latest running totals per bucket+warehouse
+  const stockMap = new Map<string, number>()
+
+  if (allTransactions) {
+    // Process transactions to find latest running total for each combination
+    for (const tx of allTransactions) {
+      const key = `${tx.bucketType}:${tx.warehouse}`
+      if (!stockMap.has(key)) {
+        stockMap.set(key, tx.runningTotal)
+      }
+    }
+  }
+
   const bucketTypes = Object.values(BucketType)
   let totalLiters = 0
 
   for (const bucketType of bucketTypes) {
     const bucketSize = BUCKET_SIZES[bucketType]
-    if (bucketSize === 0) continue // Skip IBC_TANK
+    if (bucketSize === 0) continue // Skip IBC_TANK and FREE_DEF
 
-    // Get latest running total for each warehouse
-    const { data: pallavi, error: pallaviError } = await supabase
-      .from('InventoryTransaction')
-      .select('runningTotal')
-      .eq('bucketType', bucketType)
-      .eq('warehouse', 'PALLAVI')
-      .order('date', { ascending: false })
-      .order('createdAt', { ascending: false })
-      .limit(1)
-      .single()
-    if (pallaviError && pallaviError.code !== 'PGRST116') throw pallaviError
-
-    const { data: tularam, error: tularamError } = await supabase
-      .from('InventoryTransaction')
-      .select('runningTotal')
-      .eq('bucketType', bucketType)
-      .eq('warehouse', 'TULARAM')
-      .order('date', { ascending: false })
-      .order('createdAt', { ascending: false })
-      .limit(1)
-      .single()
-    if (tularamError && tularamError.code !== 'PGRST116') throw tularamError
-
-    const pallaviStock = pallavi?.runningTotal || 0
-    const tularamStock = tularam?.runningTotal || 0
+    // Get stock from the map instead of making separate queries
+    const pallaviStock = stockMap.get(`${bucketType}:PALLAVI`) || 0
+    const tularamStock = stockMap.get(`${bucketType}:TULARAM`) || 0
     const totalBuckets = pallaviStock + tularamStock
 
     totalLiters += totalBuckets * bucketSize
