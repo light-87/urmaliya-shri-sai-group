@@ -481,7 +481,7 @@ function buildTimeline(
   expenseTransactions.forEach((t) => {
     timeline.push({
       id: `expense-${t.id}`,
-      time: t.date.toISOString(),
+      time: typeof t.date === 'string' ? t.date : new Date(t.date).toISOString(),
       type: 'EXPENSE',
       icon: t.type === 'INCOME' ? 'trending-up' : 'trending-down',
       title: t.type === 'INCOME' ? 'Income Received' : 'Expense Paid',
@@ -503,7 +503,7 @@ function buildTimeline(
   inventoryTransactions.forEach((t) => {
     timeline.push({
       id: `inventory-${t.id}`,
-      time: t.date.toISOString(),
+      time: typeof t.date === 'string' ? t.date : new Date(t.date).toISOString(),
       type: 'INVENTORY',
       icon: t.action === 'STOCK' ? 'package-plus' : 'package-minus',
       title: t.action === 'STOCK' ? 'Inventory Stocked' : 'Inventory Sold',
@@ -553,7 +553,7 @@ function buildTimeline(
 
     timeline.push({
       id: `stock-${t.id}`,
-      time: t.date.toISOString(),
+      time: typeof t.date === 'string' ? t.date : new Date(t.date).toISOString(),
       type: 'STOCK',
       icon,
       title,
