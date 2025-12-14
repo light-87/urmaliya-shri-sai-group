@@ -207,7 +207,27 @@ async function getCurrentStock(
 async function calculateStockSummary() {
   // Get bucket types and warehouses from types
   const bucketTypes = ['TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB', 'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'] as BucketType[]
-  const warehouses = ['PALLAVI', 'TULARAM', 'FACTORY'] as Warehouse[]
+
+  // OPTIMIZATION: Fetch all latest inventory transactions in a single query
+  // Get the most recent transaction for each bucket+warehouse combination
+  const { data: allTransactions } = await supabase
+    .from('InventoryTransaction')
+    .select('bucketType, warehouse, runningTotal, date, createdAt')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+
+  // Build a map of latest running totals per bucket+warehouse
+  const stockMap = new Map<string, number>()
+
+  if (allTransactions) {
+    // Process transactions to find latest running total for each combination
+    for (const tx of allTransactions) {
+      const key = `${tx.bucketType}:${tx.warehouse}`
+      if (!stockMap.has(key)) {
+        stockMap.set(key, tx.runningTotal)
+      }
+    }
+  }
 
   const summary = []
 
@@ -240,18 +260,9 @@ async function calculateStockSummary() {
       continue
     }
 
-    for (const warehouse of warehouses) {
-      // Skip FACTORY - it's not shown in the summary (only used for Free DEF tracking)
-      if (warehouse === 'FACTORY') continue
-
-      const stock = await getCurrentStock(bucketType, warehouse)
-      if (warehouse === 'PALLAVI') {
-        row.pallavi = stock
-      } else if (warehouse === 'TULARAM') {
-        row.tularam = stock
-      }
-    }
-
+    // Get stock from the map instead of making separate queries
+    row.pallavi = stockMap.get(`${bucketType}:PALLAVI`) || 0
+    row.tularam = stockMap.get(`${bucketType}:TULARAM`) || 0
     row.total = row.pallavi + row.tularam
     summary.push(row)
   }
