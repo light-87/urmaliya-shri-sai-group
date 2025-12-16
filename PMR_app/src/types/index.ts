@@ -14,8 +14,8 @@ export interface SessionData {
 }
 
 export enum Warehouse {
-  PALLAVI = 'PALLAVI',
-  TULARAM = 'TULARAM',
+  GURH = 'GURH',
+  REWA = 'REWA',
   FACTORY = 'FACTORY',
 }
 
@@ -45,10 +45,11 @@ export enum ActionType {
 // JavaScript enums for Zod validation
 export enum ExpenseAccount {
   CASH = 'CASH',
-  PRASHANT_GAYDHANE = 'PRASHANT_GAYDHANE',
-  PMR = 'PMR',
-  KPG_SAVING = 'KPG_SAVING',
-  KP_ENTERPRISES = 'KP_ENTERPRISES',
+  SHIWAM_TRIPATHI = 'SHIWAM_TRIPATHI',
+  ICICI = 'ICICI',
+  CC_CANARA = 'CC_CANARA',
+  CANARA_CURRENT = 'CANARA_CURRENT',
+  SAWALIYA_SETH_MOTORS = 'SAWALIYA_SETH_MOTORS',
 }
 
 export enum TransactionType {
@@ -80,8 +81,8 @@ export interface InventoryTransaction {
 
 export interface InventorySummary {
   bucketType: BucketType
-  pallavi: number
-  tularam: number
+  gurh: number
+  rewa: number
   total: number
 }
 
@@ -225,15 +226,16 @@ export const BUCKET_SIZES: Record<BucketType, number> = {
 
 export const ACCOUNT_LABELS: Record<ExpenseAccount, string> = {
   CASH: 'Cash',
-  PRASHANT_GAYDHANE: 'Prashant Gaydhane',
-  PMR: 'PMR',
-  KPG_SAVING: 'KPG Saving',
-  KP_ENTERPRISES: 'KP Enterprises',
+  SHIWAM_TRIPATHI: 'Shiwam Tripathi',
+  ICICI: 'ICICI Bank',
+  CC_CANARA: 'CC Canara Bank',
+  CANARA_CURRENT: 'Canara Current',
+  SAWALIYA_SETH_MOTORS: 'Sawaliya Seth Motors',
 }
 
 export const WAREHOUSE_LABELS: Record<Warehouse, string> = {
-  PALLAVI: 'Pallavi',
-  TULARAM: 'Tularam',
+  GURH: 'Gurh',
+  REWA: 'Rewa',
   FACTORY: 'Factory',
 }
 
@@ -532,4 +534,161 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   CALL_IN_7_DAYS: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   CONVERTED: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   NOT_INTERESTED: 'bg-red-100 text-red-800 border-red-300',
+}
+
+// ============================================================================
+// Registry System Types (NEW for USSG)
+// ============================================================================
+
+// Registry transaction types - JavaScript enums for Zod validation
+export enum RegistryTransactionType {
+  SALE_DEED = 'Sale Deed',
+  GIFT_DEED = 'Gift Deed',
+  LEASE_DEED = 'Lease Deed',
+  MORTGAGE_DEED = 'Mortgage Deed',
+  POWER_OF_ATTORNEY = 'Power of Attorney',
+  AGREEMENT_TO_SELL = 'Agreement to Sell',
+  OTHER = 'Other',
+}
+
+export enum RegistryPaymentStatus {
+  PENDING = 'Pending',
+  PARTIAL = 'Partial',
+  PAID = 'Paid',
+  CANCELLED = 'Cancelled',
+}
+
+// Registry transaction interface
+export interface RegistryTransaction {
+  id: string
+  transactionId: string // REG001, REG002, etc.
+  registrationNumber?: string
+
+  // Basic Information
+  date: string
+  propertyLocation: string
+  sellerName: string
+  buyerName: string
+  transactionType: RegistryTransactionType
+  propertyValue: number
+
+  // Government Fees (User Input)
+  stampDuty: number
+  registrationFees: number
+  mutationFees: number
+  documentationCharge: number
+
+  // Auto-calculated: 0.25% of property value (EXPENSE)
+  registrarOfficeFees: number
+
+  // Service Charges (User Input)
+  operatorCost: number
+  brokerCommission: number
+  recommendationFees: number
+
+  // Payment Information (User Input)
+  creditReceived: number
+  paymentMethod?: string
+
+  // Auto-calculated: 1.5% of stamp duty (INCOME from government)
+  stampCommission: number
+
+  // Auto-calculated fields
+  totalExpenses: number
+  balanceDue: number // Total expenses - Credit received
+  amountProfit: number // (Credit received + Stamp commission) - Total expenses
+
+  // Payment Status
+  paymentStatus: RegistryPaymentStatus
+
+  // Notes
+  notes?: string
+
+  // Timestamps
+  createdAt: string
+  updatedAt: string
+}
+
+// Registry input type for forms
+export interface RegistryInput {
+  date: Date
+  registrationNumber?: string
+  propertyLocation: string
+  sellerName: string
+  buyerName: string
+  transactionType: RegistryTransactionType
+  propertyValue: number
+
+  // Government Fees
+  stampDuty?: number
+  registrationFees?: number
+  mutationFees?: number
+  documentationCharge?: number
+
+  // Service Charges
+  operatorCost?: number
+  brokerCommission?: number
+  recommendationFees?: number
+
+  // Payment Information
+  creditReceived?: number
+  paymentMethod?: string
+
+  // Payment Status
+  paymentStatus?: RegistryPaymentStatus
+
+  // Notes
+  notes?: string
+}
+
+// Registry response types
+export interface RegistryPagination {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface RegistryResponse {
+  transactions: RegistryTransaction[]
+  pagination: RegistryPagination
+}
+
+export interface RegistrySummary {
+  totalTransactions: number
+  totalIncome: number // Credit received + Stamp commission
+  totalExpenses: number
+  netProfit: number
+  pendingPayments: number
+  statusBreakdown: {
+    status: RegistryPaymentStatus
+    count: number
+    amount: number
+  }[]
+}
+
+// Registry display labels
+export const REGISTRY_TYPE_LABELS: Record<RegistryTransactionType, string> = {
+  [RegistryTransactionType.SALE_DEED]: 'Sale Deed',
+  [RegistryTransactionType.GIFT_DEED]: 'Gift Deed',
+  [RegistryTransactionType.LEASE_DEED]: 'Lease Deed',
+  [RegistryTransactionType.MORTGAGE_DEED]: 'Mortgage Deed',
+  [RegistryTransactionType.POWER_OF_ATTORNEY]: 'Power of Attorney',
+  [RegistryTransactionType.AGREEMENT_TO_SELL]: 'Agreement to Sell',
+  [RegistryTransactionType.OTHER]: 'Other',
+}
+
+export const REGISTRY_STATUS_LABELS: Record<RegistryPaymentStatus, string> = {
+  [RegistryPaymentStatus.PENDING]: 'Pending',
+  [RegistryPaymentStatus.PARTIAL]: 'Partial',
+  [RegistryPaymentStatus.PAID]: 'Paid',
+  [RegistryPaymentStatus.CANCELLED]: 'Cancelled',
+}
+
+// Registry status colors for UI
+export const REGISTRY_STATUS_COLORS: Record<RegistryPaymentStatus, string> = {
+  [RegistryPaymentStatus.PENDING]: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  [RegistryPaymentStatus.PARTIAL]: 'bg-blue-100 text-blue-800 border-blue-300',
+  [RegistryPaymentStatus.PAID]: 'bg-green-100 text-green-800 border-green-300',
+  [RegistryPaymentStatus.CANCELLED]: 'bg-red-100 text-red-800 border-red-300',
 }
