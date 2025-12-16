@@ -468,9 +468,9 @@ async function calculateBucketsInLiters(): Promise<number> {
     if (bucketSize === 0) continue // Skip IBC_TANK and FREE_DEF
 
     // Get stock from the map instead of making separate queries
-    const pallaviStock = stockMap.get(`${bucketType}:PALLAVI`) || 0
-    const tularamStock = stockMap.get(`${bucketType}:TULARAM`) || 0
-    const totalBuckets = pallaviStock + tularamStock
+    const gurhStock = stockMap.get(`${bucketType}:GURH`) || 0
+    const rewaStock = stockMap.get(`${bucketType}:REWA`) || 0
+    const totalBuckets = gurhStock + rewaStock
 
     totalLiters += totalBuckets * bucketSize
   }

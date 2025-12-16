@@ -40,9 +40,10 @@ function parseDate(val: string | number): Date {
 // Helper function to normalize warehouse names
 function normalizeWarehouse(val: string): Warehouse {
   const normalized = val.trim().toUpperCase()
-  if (normalized === 'PALLAVI') return Warehouse.PALLAVI
-  if (normalized === 'TULARAM') return Warehouse.TULARAM
-  throw new Error(`Invalid warehouse: ${val}. Must be PALLAVI or TULARAM`)
+  if (normalized === 'GURH') return Warehouse.GURH
+  if (normalized === 'REWA') return Warehouse.REWA
+  if (normalized === 'FACTORY') return Warehouse.FACTORY
+  throw new Error(`Invalid warehouse: ${val}. Must be GURH, REWA, or FACTORY`)
 }
 
 // Helper function to normalize bucket types
@@ -104,17 +105,18 @@ function normalizeAccount(val: string): ExpenseAccount {
   // Map common variations
   const mapping: Record<string, ExpenseAccount> = {
     'CASH': ExpenseAccount.CASH,
-    'PRASHANT_GAYDHANE': ExpenseAccount.PRASHANT_GAYDHANE,
-    'PMR': ExpenseAccount.PMR,
-    'KPG_SAVING': ExpenseAccount.KPG_SAVING,
-    'KP_ENTERPRISES': ExpenseAccount.KP_ENTERPRISES,
+    'SHIWAM_TRIPATHI': ExpenseAccount.SHIWAM_TRIPATHI,
+    'ICICI': ExpenseAccount.ICICI,
+    'CC_CANARA': ExpenseAccount.CC_CANARA,
+    'CANARA_CURRENT': ExpenseAccount.CANARA_CURRENT,
+    'SAWALIYA_SETH_MOTORS': ExpenseAccount.SAWALIYA_SETH_MOTORS,
   }
 
   if (mapping[normalized]) {
     return mapping[normalized]
   }
 
-  throw new Error(`Invalid account: ${val}. Must be one of: CASH, PRASHANT_GAYDHANE, PMR, KPG_SAVING, KP_ENTERPRISES`)
+  throw new Error(`Invalid account: ${val}. Must be one of: CASH, SHIWAM_TRIPATHI, ICICI, CC_CANARA, CANARA_CURRENT, SAWALIYA_SETH_MOTORS`)
 }
 
 // Helper function to normalize transaction types
