@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
 import { RegistryTransactionType, PaymentStatus } from '@/types'
 
 interface SearchFilters {
@@ -56,7 +55,6 @@ interface RegistryTransaction {
 
 export default function RegistrySearchPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<RegistryTransaction[]>([])
   const [totalResults, setTotalResults] = useState(0)
@@ -95,20 +93,12 @@ export default function RegistrySearchPage() {
       if (data.success) {
         setResults(data.transactions)
         setTotalResults(data.pagination?.total || data.transactions.length)
-
-        toast({
-          title: 'Search Complete',
-          description: `Found ${data.transactions.length} transaction(s)`,
-        })
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to search transactions',
-        variant: 'destructive',
-      })
+      console.error('Failed to search transactions:', error)
+      alert('Failed to search transactions')
     } finally {
       setLoading(false)
     }
@@ -132,10 +122,7 @@ export default function RegistrySearchPage() {
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    toast({
-      title: 'Info',
-      description: 'Export feature coming soon',
-    })
+    alert('Export feature coming soon')
   }
 
   const handleViewTransaction = (id: string) => {

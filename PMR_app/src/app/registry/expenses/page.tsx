@@ -29,9 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/hooks/use-toast'
-import { ExpenseAccount, TransactionType } from '@/types'
-import { ACCOUNT_LABELS } from '@/lib/constants'
+import { ExpenseAccount, TransactionType, ACCOUNT_LABELS } from '@/types'
 
 type RegistryExpenseCategory =
   | 'OFFICE_RENT'
@@ -79,7 +77,6 @@ interface ExpenseSummary {
 
 export default function RegistryExpensesPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [expenses, setExpenses] = useState<RegistryExpense[]>([])
   const [summary, setSummary] = useState<ExpenseSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -126,11 +123,8 @@ export default function RegistryExpensesPage() {
         throw new Error(data.message)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch registry expenses',
-        variant: 'destructive',
-      })
+      console.error('Failed to fetch registry expenses:', error)
+      alert('Failed to fetch registry expenses')
     } finally {
       setLoading(false)
     }
@@ -181,12 +175,7 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: editingExpense
-            ? 'Expense updated successfully'
-            : 'Expense added successfully',
-        })
+        alert(editingExpense ? 'Expense updated successfully' : 'Expense added successfully')
         setShowAddDialog(false)
         setEditingExpense(null)
         resetForm()
@@ -196,11 +185,8 @@ export default function RegistryExpensesPage() {
         throw new Error(data.message)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save expense',
-        variant: 'destructive',
-      })
+      console.error('Failed to save expense:', error)
+      alert(error instanceof Error ? error.message : 'Failed to save expense')
     }
   }
 
@@ -215,21 +201,15 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: 'Expense deleted successfully',
-        })
+        alert('Expense deleted successfully')
         fetchExpenses()
         fetchSummary()
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete expense',
-        variant: 'destructive',
-      })
+      console.error('Failed to delete expense:', error)
+      alert('Failed to delete expense')
     }
   }
 
@@ -264,10 +244,7 @@ export default function RegistryExpensesPage() {
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    toast({
-      title: 'Info',
-      description: 'Export feature coming soon',
-    })
+    alert('Export feature coming soon')
   }
 
   if (loading) {

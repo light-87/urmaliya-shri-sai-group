@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
 
 interface DashboardData {
   period: string
@@ -60,7 +59,6 @@ interface DashboardData {
 
 export default function RegistryDashboardPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [period, setPeriod] = useState('current_month')
@@ -81,11 +79,8 @@ export default function RegistryDashboardPage() {
         throw new Error(data.message)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch dashboard data',
-        variant: 'destructive',
-      })
+      console.error('Failed to fetch dashboard data:', error)
+      alert('Failed to fetch dashboard data')
     } finally {
       setLoading(false)
     }
