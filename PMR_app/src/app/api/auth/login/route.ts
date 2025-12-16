@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
 
     // Find PIN in database using Supabase
     const { data: pinRecord, error } = await supabase
-      .from('Pin')
+      .from('pins')
       .select('*')
-      .eq('pinNumber', pin)
+      .eq('pin', pin)
+      .eq('is_active', true)
       .single()
 
     if (error || !pinRecord) {
