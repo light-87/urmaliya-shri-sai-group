@@ -436,10 +436,14 @@ COMMENT ON FUNCTION get_next_registry_transaction_id IS 'Generates next sequenti
 -- STEP 13: Create Default Admin PIN (IMPORTANT!)
 -- ============================================================================
 
--- Insert a default admin PIN for initial access
--- PIN: 123456 (CHANGE THIS AFTER FIRST LOGIN!)
+-- Insert default PINs for different access levels
+-- IMPORTANT: These are default PINs - change them after setup for security!
 INSERT INTO pins (pin, role, name, is_active)
-VALUES ('123456', 'ADMIN', 'System Administrator', true)
+VALUES
+  ('1111', 'ADMIN', 'Admin User', true),
+  ('2222', 'REGISTRY_MANAGER', 'Registry Manager', true),
+  ('3333', 'EXPENSE_INVENTORY', 'Expense & Inventory Manager', true),
+  ('4444', 'INVENTORY_ONLY', 'Inventory User', true)
 ON CONFLICT (pin) DO NOTHING;
 
 -- ============================================================================
@@ -500,7 +504,7 @@ SELECT '💰 Expense Accounts: 6 (Cash, Shiwam Tripathi, ICICI, CC Canara, Canar
 UNION ALL
 SELECT '📋 Registry System: Ready with auto-calculations'
 UNION ALL
-SELECT '🔑 Default Admin PIN: 123456 (CHANGE THIS IMMEDIATELY!)';
+SELECT '🔑 Default PINs: 1111 (Admin), 2222 (Registry), 3333 (Expense/Inv), 4444 (Inv Only)';
 
 -- ============================================================================
 -- IMPORTANT NOTES
@@ -508,16 +512,20 @@ SELECT '🔑 Default Admin PIN: 123456 (CHANGE THIS IMMEDIATELY!)';
 
 /*
 IMPORTANT SECURITY NOTES:
-1. Change the default admin PIN (123456) immediately after setup!
-2. Create additional user PINs for different roles as needed
+1. Default PINs have been created for all access levels (change after setup!):
+   - 1111: ADMIN (full access to all features)
+   - 2222: REGISTRY_MANAGER (registry features only)
+   - 3333: EXPENSE_INVENTORY (expenses and inventory management)
+   - 4444: INVENTORY_ONLY (inventory view and management only)
+2. Change these default PINs immediately after setup for security!
 3. Set up proper backup procedures for your data
 4. Keep your database credentials secure
 
 NEXT STEPS:
-1. Change the default admin PIN
-2. Create user accounts (PINs) for your team
+1. Run this SQL script in your Supabase database
+2. Change all default PINs for security
 3. Configure .env file with database connection details
-4. Start the application and login with admin PIN
+4. Start the application and login with appropriate PIN
 5. Begin using the system!
 
 WAREHOUSE SETUP:
