@@ -6,8 +6,8 @@ import type { BucketType } from '@/types'
 
 interface InventorySummary {
   bucketType: BucketType
-  pallavi: number
-  tularam: number
+  gurh: number
+  rewa: number
   total: number
 }
 
@@ -27,8 +27,8 @@ export function InventoryDashboard({ summary }: InventoryDashboardProps) {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-3 font-semibold">Bucket Type</th>
-                <th className="text-center p-3 font-semibold">Pallavi</th>
-                <th className="text-center p-3 font-semibold">Tularam</th>
+                <th className="text-center p-3 font-semibold">Gurh</th>
+                <th className="text-center p-3 font-semibold">Rewa</th>
                 <th className="text-center p-3 font-semibold">Total</th>
               </tr>
             </thead>
@@ -38,8 +38,8 @@ export function InventoryDashboard({ summary }: InventoryDashboardProps) {
                   <td className="p-3 font-medium">
                     {BUCKET_TYPE_LABELS[row.bucketType]}
                   </td>
-                  <td className="text-center p-3">{row.pallavi}</td>
-                  <td className="text-center p-3">{row.tularam}</td>
+                  <td className="text-center p-3">{row.gurh}</td>
+                  <td className="text-center p-3">{row.rewa}</td>
                   <td className="text-center p-3 font-semibold">{row.total}</td>
                 </tr>
               ))}
