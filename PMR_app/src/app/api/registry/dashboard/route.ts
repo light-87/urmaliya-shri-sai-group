@@ -15,6 +15,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Registry Dashboard is ADMIN only
+    if (session.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, message: 'Access denied. Admin access required for Registry Dashboard.' },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') || 'current_month' // current_month, last_month, last_3_months, last_6_months, year
 

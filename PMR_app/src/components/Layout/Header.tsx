@@ -45,7 +45,7 @@ export function Header() {
     { href: '/registry', label: 'Registry', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
     { href: '/registry/expenses', label: 'Registry Expenses', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
     { href: '/registry/search', label: 'Registry Search', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
-    { href: '/registry/dashboard', label: 'Registry Dashboard', roles: ['ADMIN', 'REGISTRY_MANAGER'] },
+    { href: '/registry/dashboard', label: 'Registry Dashboard', roles: ['ADMIN'] },
   ]
 
   // Select appropriate nav items based on role and mode
