@@ -35,10 +35,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Build Supabase query
+    // Build Supabase query - EXCLUDE registry expenses
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
+      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .ilike('name', name)  // Case insensitive match
       .order('date', { ascending: true })
 

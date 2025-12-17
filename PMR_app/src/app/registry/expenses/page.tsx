@@ -32,31 +32,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ExpenseAccount, TransactionType, ACCOUNT_LABELS } from '@/types'
 
-type RegistryExpenseCategory =
-  | 'OFFICE_RENT'
-  | 'STAFF_SALARY'
-  | 'UTILITIES'
-  | 'EQUIPMENT'
-  | 'STATIONERY'
-  | 'TRANSPORTATION'
-  | 'MARKETING'
-  | 'PROFESSIONAL_FEES'
-  | 'MAINTENANCE'
-  | 'OTHER'
-
-const CATEGORY_LABELS: Record<RegistryExpenseCategory, string> = {
-  OFFICE_RENT: 'Office Rent',
-  STAFF_SALARY: 'Staff Salary',
-  UTILITIES: 'Utilities',
-  EQUIPMENT: 'Equipment',
-  STATIONERY: 'Stationery',
-  TRANSPORTATION: 'Transportation',
-  MARKETING: 'Marketing',
-  PROFESSIONAL_FEES: 'Professional Fees',
-  MAINTENANCE: 'Maintenance',
-  OTHER: 'Other',
-}
-
 interface RegistryExpense {
   id: string
   date: string
@@ -88,7 +63,6 @@ export default function RegistryExpensesPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [accountFilter, setAccountFilter] = useState('ALL')
-  const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
 
   // Form state
@@ -98,13 +72,12 @@ export default function RegistryExpensesPage() {
     account: ExpenseAccount.CASH,
     type: TransactionType.EXPENSE,
     name: '',
-    category: '' as RegistryExpenseCategory | '',
   })
 
   useEffect(() => {
     fetchExpenses()
     fetchSummary()
-  }, [dateFrom, dateTo, accountFilter, categoryFilter, typeFilter])
+  }, [dateFrom, dateTo, accountFilter, typeFilter])
 
   const fetchExpenses = async () => {
     try {
@@ -112,7 +85,6 @@ export default function RegistryExpensesPage() {
       if (dateFrom) params.append('dateFrom', dateFrom)
       if (dateTo) params.append('dateTo', dateTo)
       if (accountFilter !== 'ALL') params.append('account', accountFilter)
-      if (categoryFilter !== 'ALL') params.append('category', categoryFilter)
       if (typeFilter !== 'ALL') params.append('type', typeFilter)
 
       const response = await fetch(`/api/registry/expenses?${params}`)
@@ -125,7 +97,6 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to fetch registry expenses:', error)
-      alert('Failed to fetch registry expenses')
     } finally {
       setLoading(false)
     }
@@ -176,7 +147,6 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(editingExpense ? 'Expense updated successfully' : 'Expense added successfully')
         setShowAddDialog(false)
         setEditingExpense(null)
         resetForm()
@@ -187,7 +157,6 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to save expense:', error)
-      alert(error instanceof Error ? error.message : 'Failed to save expense')
     }
   }
 
@@ -202,7 +171,6 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('Expense deleted successfully')
         fetchExpenses()
         fetchSummary()
       } else {
@@ -210,15 +178,12 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to delete expense:', error)
-      alert('Failed to delete expense')
     }
   }
 
   const handleEdit = (expense: RegistryExpense) => {
-    // Extract category from name if it exists
-    const categoryMatch = expense.name.match(/\[(.*?)\]/)
-    const category = categoryMatch ? categoryMatch[1] as RegistryExpenseCategory : ''
-    const cleanName = category ? expense.name.replace(/\[.*?\]\s*/, '') : expense.name
+    // Strip [REGISTRY] tag from name for editing
+    const cleanName = expense.name.replace(/^\[REGISTRY\]\s*/, '')
 
     setFormData({
       date: format(new Date(expense.date), 'yyyy-MM-dd'),
@@ -226,7 +191,6 @@ export default function RegistryExpensesPage() {
       account: expense.account,
       type: expense.type,
       name: cleanName,
-      category,
     })
     setEditingExpense(expense)
     setShowAddDialog(true)
@@ -239,7 +203,6 @@ export default function RegistryExpensesPage() {
       account: ExpenseAccount.CASH,
       type: TransactionType.EXPENSE,
       name: '',
-      category: '',
     })
   }
 
@@ -345,7 +308,7 @@ export default function RegistryExpensesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>From Date</Label>
               <Input
@@ -371,22 +334,6 @@ export default function RegistryExpensesPage() {
                 <SelectContent>
                   <SelectItem value="ALL">All Accounts</SelectItem>
                   {Object.entries(ACCOUNT_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Category</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Categories</SelectItem>
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
                     </SelectItem>
@@ -421,8 +368,7 @@ export default function RegistryExpensesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -432,63 +378,55 @@ export default function RegistryExpensesPage() {
             <TableBody>
               {expenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No expenses found
                   </TableCell>
                 </TableRow>
               ) : (
                 expenses.map((expense) => {
-                  const categoryMatch = expense.name.match(/\[(.*?)\]/)
-                  const category = categoryMatch ? categoryMatch[1] : 'N/A'
-                  const cleanName = categoryMatch
-                    ? expense.name.replace(/\[.*?\]\s*/, '')
-                    : expense.name
+                  // Strip [REGISTRY] tag from name for display
+                  const displayName = expense.name.replace(/^\[REGISTRY\]\s*/, '')
 
                   return (
                     <TableRow key={expense.id}>
                       <TableCell>{format(new Date(expense.date), 'dd MMM yyyy')}</TableCell>
-                      <TableCell>{cleanName}</TableCell>
-                      <TableCell>
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                          {category}
-                        </span>
-                      </TableCell>
+                      <TableCell>{displayName}</TableCell>
                       <TableCell>{ACCOUNT_LABELS[expense.account]}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`text-xs px-2 py-1 rounded ${
-                            expense.type === 'INCOME'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                    <TableCell>
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          expense.type === 'INCOME'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {expense.type}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      <span className={expense.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}>
+                        ₹{Number(expense.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(expense)}
                         >
-                          {expense.type}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        <span className={expense.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}>
-                          ₹{Number(expense.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(expense)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(expense.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(expense.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                   )
                 })
               )}
@@ -517,33 +455,12 @@ export default function RegistryExpensesPage() {
             </div>
 
             <div>
-              <Label>Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, category: value as RegistryExpenseCategory })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Description</Label>
+              <Label>Name</Label>
               <Input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter description"
+                placeholder="Enter name"
                 required
               />
             </div>

@@ -10,23 +10,10 @@ export const dynamic = 'force-dynamic'
 // Zod schema for registry expense validation
 const registryExpenseSchema = z.object({
   date: z.string(),
-  amount: z.number().positive('Amount must be positive'),
+  amount: z.number().min(0, 'Amount cannot be negative'),
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
-  name: z.string().min(1, 'Description is required'),
-  category: z.enum([
-    'OFFICE_RENT',
-    'STAFF_SALARY',
-    'UTILITIES',
-    'EQUIPMENT',
-    'STATIONERY',
-    'TRANSPORTATION',
-    'MARKETING',
-    'PROFESSIONAL_FEES',
-    'MAINTENANCE',
-    'OTHER'
-  ]).optional(),
-  notes: z.string().optional(),
+  name: z.string().min(1, 'Name is required'),
 })
 
 // GET: Fetch all registry-related expenses
@@ -50,10 +37,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
 
-    // Build query
+    // Build query - ONLY fetch registry expenses (those with category tags)
     let query = supabase
       .from('ExpenseTransaction')
       .select('*', { count: 'exact' })
+      .like('name', '[%')  // Only expenses with category tags starting with '['
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -113,11 +101,8 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validatedData = registryExpenseSchema.parse(body)
 
-    // Add category tag to name if provided
-    let expenseName = validatedData.name
-    if (validatedData.category) {
-      expenseName = `[${validatedData.category}] ${validatedData.name}`
-    }
+    // Add [REGISTRY] tag to name to distinguish from normal expenses
+    const expenseName = `[REGISTRY] ${validatedData.name}`
 
     // Create expense transaction
     const { data: expense, error } = await supabase
@@ -180,18 +165,13 @@ export async function PUT(request: NextRequest) {
     // Validate update data
     const validatedData = registryExpenseSchema.partial().parse(updateData)
 
-    // Add category tag to name if provided
-    let expenseName = validatedData.name
-    if (validatedData.category && validatedData.name) {
-      expenseName = `[${validatedData.category}] ${validatedData.name}`
-    }
-
     const updatePayload: any = {}
     if (validatedData.date) updatePayload.date = validatedData.date
     if (validatedData.amount) updatePayload.amount = validatedData.amount
     if (validatedData.account) updatePayload.account = validatedData.account
     if (validatedData.type) updatePayload.type = validatedData.type
-    if (expenseName) updatePayload.name = expenseName
+    // Add [REGISTRY] tag to name to distinguish from normal expenses
+    if (validatedData.name) updatePayload.name = `[REGISTRY] ${validatedData.name}`
 
     const { data: expense, error } = await supabase
       .from('ExpenseTransaction')

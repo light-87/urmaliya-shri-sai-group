@@ -43,10 +43,11 @@ export async function GET(request: NextRequest) {
       endDate = new Date()
       startDate = subMonths(endDate, 12)
     } else if (view === 'alltime') {
-      // Get earliest and latest dates from data
+      // Get earliest and latest dates from data - EXCLUDE registry expenses
       const { data: earliest, error: earliestError } = await supabase
         .from('ExpenseTransaction')
         .select('date')
+        .not('name', 'like', '[%')  // Exclude registry expenses
         .order('date', { ascending: true })
         .limit(1)
         .single()
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
       const { data: latest, error: latestError } = await supabase
         .from('ExpenseTransaction')
         .select('date')
+        .not('name', 'like', '[%')  // Exclude registry expenses
         .order('date', { ascending: false })
         .limit(1)
         .single()
@@ -68,10 +70,11 @@ export async function GET(request: NextRequest) {
       endDate = endOfYear(new Date(year, 0, 1))
     }
 
-    // Build Supabase query with filters
+    // Build Supabase query with filters - EXCLUDE registry expenses
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
+      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .gte('date', startDate.toISOString())
       .lte('date', endDate.toISOString())
       .order('date', { ascending: true })

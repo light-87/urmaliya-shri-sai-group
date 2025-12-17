@@ -103,12 +103,20 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
     // Batch insert all inventory transactions at once
     if (inventoryTransactions.length > 0) {
-      const { error } = await supabase
-        .from('InventoryTransaction')
-        .insert(inventoryTransactions)
+      try {
+        const { error } = await supabase
+          .from('InventoryTransaction')
+          .insert(inventoryTransactions)
 
-      if (error) throw error
-      inventoryImported = inventoryTransactions.length
+        if (error) throw error
+        inventoryImported = inventoryTransactions.length
+      } catch (error) {
+        errors.push({
+          type: 'inventory',
+          row: 0,
+          message: error instanceof Error ? error.message : 'Failed to import inventory data',
+        })
+      }
     }
 
     // Sort expense data by date
@@ -142,12 +150,31 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
 
     // Batch insert all expense transactions at once
     if (expenseTransactions.length > 0) {
-      const { error } = await supabase
-        .from('ExpenseTransaction')
-        .insert(expenseTransactions)
+      try {
+        const { error } = await supabase
+          .from('ExpenseTransaction')
+          .insert(expenseTransactions)
 
-      if (error) throw error
-      expensesImported = expenseTransactions.length
+        if (error) {
+          console.error('Expense import database error:', error)
+          throw error
+        }
+        expensesImported = expenseTransactions.length
+      } catch (error) {
+        // Show the actual database error message
+        const errorMessage = error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as any).message)
+          : 'Failed to import expense data'
+
+        console.error('Expense import failed:', errorMessage, error)
+        errors.push({
+          type: 'expense',
+          row: 0,
+          message: errorMessage,
+        })
+      }
     }
 
     // If there were errors but some records were imported, it's a partial success
@@ -166,6 +193,8 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
       expensesImported,
     }
   } catch (error) {
+    // Handle unexpected errors not caught in individual try-catch blocks
+    console.error('Unexpected bulk import error:', error)
     return {
       success: false,
       inventoryImported,
@@ -174,7 +203,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
         {
           type: 'inventory',
           row: 0,
-          message: error instanceof Error ? error.message : 'Failed to import data',
+          message: error instanceof Error ? error.message : 'Unexpected error during import',
         },
       ],
     }

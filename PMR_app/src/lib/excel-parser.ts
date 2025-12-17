@@ -106,24 +106,29 @@ function normalizeAccount(val: string): ExpenseAccount {
   const mapping: Record<string, ExpenseAccount> = {
     'CASH': ExpenseAccount.CASH,
     'SHIWAM_TRIPATHI': ExpenseAccount.SHIWAM_TRIPATHI,
+    'SHIVAM_TRIPATHI': ExpenseAccount.SHIWAM_TRIPATHI, // Old data mapping
     'ICICI': ExpenseAccount.ICICI,
+    'ICICI_FIRM': ExpenseAccount.ICICI, // Old data mapping
     'CC_CANARA': ExpenseAccount.CC_CANARA,
     'CANARA_CURRENT': ExpenseAccount.CANARA_CURRENT,
     'SAWALIYA_SETH_MOTORS': ExpenseAccount.SAWALIYA_SETH_MOTORS,
+    'VINAY': ExpenseAccount.VINAY,
+    'SACHIN': ExpenseAccount.SACHIN,
   }
 
   if (mapping[normalized]) {
     return mapping[normalized]
   }
 
-  throw new Error(`Invalid account: ${val}. Must be one of: CASH, SHIWAM_TRIPATHI, ICICI, CC_CANARA, CANARA_CURRENT, SAWALIYA_SETH_MOTORS`)
+  throw new Error(`Invalid account: ${val}. Must be one of: CASH, SHIWAM_TRIPATHI, ICICI, CC_CANARA, CANARA_CURRENT, SAWALIYA_SETH_MOTORS, VINAY, SACHIN`)
 }
 
 // Helper function to normalize transaction types
 function normalizeType(val: string): TransactionType {
-  const normalized = val.trim().toUpperCase()
+  const normalized = val.trim().toUpperCase().replace(/\s+/g, '_')
   if (normalized === 'INCOME') return TransactionType.INCOME
   if (normalized === 'EXPENSE') return TransactionType.EXPENSE
+  if (normalized === 'GIVEN_DEBT') return TransactionType.EXPENSE // Old data mapping
   throw new Error(`Invalid type: ${val}. Must be INCOME or EXPENSE`)
 }
 

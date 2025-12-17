@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 // Validation schema for creating expense transaction
 const createExpenseSchema = z.object({
   date: z.string().transform(str => new Date(str)),
-  amount: z.number().positive(),
+  amount: z.number().min(0),
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
   name: z.string().min(1),
@@ -44,10 +44,11 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build Supabase query
+    // Build Supabase query - EXCLUDE registry expenses (those with category tags)
     let query = supabase
       .from('ExpenseTransaction')
       .select('*', { count: 'exact' })
+      .not('name', 'like', '[%')  // Exclude expenses with category tags starting with '['
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)

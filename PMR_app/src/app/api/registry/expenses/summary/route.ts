@@ -19,10 +19,11 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
 
-    // Build query
+    // Build query - ONLY fetch registry expenses (those with category tags)
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
+      .like('name', '[%')  // Only expenses with category tags starting with '['
 
     if (dateFrom) {
       query = query.gte('date', dateFrom)

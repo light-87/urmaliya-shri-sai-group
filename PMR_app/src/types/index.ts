@@ -50,6 +50,8 @@ export enum ExpenseAccount {
   CC_CANARA = 'CC_CANARA',
   CANARA_CURRENT = 'CANARA_CURRENT',
   SAWALIYA_SETH_MOTORS = 'SAWALIYA_SETH_MOTORS',
+  VINAY = 'VINAY',
+  SACHIN = 'SACHIN',
 }
 
 export enum TransactionType {
@@ -231,6 +233,8 @@ export const ACCOUNT_LABELS: Record<ExpenseAccount, string> = {
   CC_CANARA: 'CC Canara Bank',
   CANARA_CURRENT: 'Canara Current',
   SAWALIYA_SETH_MOTORS: 'Sawaliya Seth Motors',
+  VINAY: 'Vinay',
+  SACHIN: 'Sachin',
 }
 
 export const WAREHOUSE_LABELS: Record<Warehouse, string> = {

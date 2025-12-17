@@ -47,17 +47,19 @@ export async function GET(request: NextRequest) {
       stockResult,
       stockSummaryResult,
     ] = await Promise.all([
-      // Current day expenses
+      // Current day expenses - EXCLUDE registry expenses
       supabase
         .from('ExpenseTransaction')
         .select('*')
+        .not('name', 'like', '[%')  // Exclude registry expenses with category tags
         .gte('date', dayStart.toISOString())
         .lte('date', dayEnd.toISOString())
         .order('date', { ascending: false }),
-      // Previous day expenses for comparison
+      // Previous day expenses for comparison - EXCLUDE registry expenses
       supabase
         .from('ExpenseTransaction')
         .select('*')
+        .not('name', 'like', '[%')  // Exclude registry expenses with category tags
         .gte('date', prevDayStart.toISOString())
         .lte('date', prevDayEnd.toISOString()),
       // Current day inventory
