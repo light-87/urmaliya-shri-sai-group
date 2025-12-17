@@ -52,6 +52,13 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    // Registry Dashboard - ADMIN only
+    if (path.startsWith('/registry/dashboard')) {
+      if (role !== 'ADMIN') {
+        return NextResponse.redirect(new URL('/registry', request.url))
+      }
+    }
+
     // Registry routes - require ADMIN or REGISTRY_MANAGER
     if (path.startsWith('/registry')) {
       if (role !== 'ADMIN' && role !== 'REGISTRY_MANAGER') {
