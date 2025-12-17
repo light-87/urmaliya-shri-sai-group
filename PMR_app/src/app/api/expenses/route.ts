@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 // Validation schema for creating expense transaction
 const createExpenseSchema = z.object({
   date: z.string().transform(str => new Date(str)),
-  amount: z.number().positive(),
+  amount: z.number().min(0),
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
   name: z.string().min(1),

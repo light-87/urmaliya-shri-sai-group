@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS "ExpenseTransaction" (
     'CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
   )),
   CONSTRAINT valid_type CHECK (type IN ('INCOME', 'EXPENSE')),
-  CONSTRAINT positive_amount CHECK (amount > 0)
+  CONSTRAINT positive_amount CHECK (amount >= 0)
 );
 
 CREATE TRIGGER update_expense_transaction_updated_at

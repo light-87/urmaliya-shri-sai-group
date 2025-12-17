@@ -25,7 +25,7 @@ import type { ExpenseAccount, TransactionType } from '@/types'
 
 const formSchema = z.object({
   date: z.string().min(1, 'Date is required'),
-  amount: z.number().positive('Amount must be positive'),
+  amount: z.number().min(0, 'Amount cannot be negative'),
   account: z.enum(['CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN']),
   type: z.enum(['INCOME', 'EXPENSE']),
   name: z.string().min(1, 'Name is required'),
