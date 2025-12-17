@@ -40,6 +40,7 @@ export enum BucketType {
   CUMMINS_20L = 'CUMMINS_20L',
   OTHER_20L = 'OTHER_20L',
   // New inventory items (accessories/filters)
+  OTHER_ITEMS = 'OTHER_ITEMS',
   PP_FILTER = 'PP_FILTER',
   WOUND_FILTER = 'WOUND_FILTER',
   BAG_FILTER = 'BAG_FILTER',
@@ -229,6 +230,7 @@ export const BUCKET_TYPE_LABELS: Record<BucketType, string> = {
   CUMMINS_20L: 'Cummins 20L',
   OTHER_20L: 'Other 20L',
   // New inventory items
+  OTHER_ITEMS: 'Other Items',
   PP_FILTER: 'P.P. Filter',
   WOUND_FILTER: 'Wound Filter',
   BAG_FILTER: 'Bag Filter',
@@ -262,6 +264,7 @@ export const BUCKET_SIZES: Record<BucketType, number> = {
   CUMMINS_20L: 20, // Deducts 20L from FREE_DEF when sold
   OTHER_20L: 20, // Deducts 20L from FREE_DEF when sold
   // New inventory items (do NOT affect FREE_DEF)
+  OTHER_ITEMS: 0, // Tracked as units, no FREE_DEF deduction
   PP_FILTER: 0, // Tracked as units, no FREE_DEF deduction
   WOUND_FILTER: 0, // Tracked as units, no FREE_DEF deduction
   BAG_FILTER: 0, // Tracked as units, no FREE_DEF deduction
