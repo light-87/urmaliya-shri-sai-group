@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Get backup logs from database to add metadata
     const { data: backupLogs, error } = await supabase
-      .from('BackupLog')
+      .from('backup_logs')
       .select('*')
       .eq('status', 'SUCCESS')
       .not('driveFileId', 'is', null)

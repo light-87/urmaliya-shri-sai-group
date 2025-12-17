@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
         driveFileId: result.driveFileId,
         inventoryCount: result.inventoryCount,
         expenseCount: result.expenseCount,
+        stockCount: result.stockCount,
+        leadsCount: result.leadsCount,
+        registryCount: result.registryCount,
+        warehousesCount: result.warehousesCount,
+        expenseAccountsCount: result.expenseAccountsCount,
       })
     } else {
       return NextResponse.json(
@@ -70,6 +75,11 @@ export async function POST(request: NextRequest) {
           message: result.errorMessage || 'Backup failed',
           inventoryCount: result.inventoryCount,
           expenseCount: result.expenseCount,
+          stockCount: result.stockCount,
+          leadsCount: result.leadsCount,
+          registryCount: result.registryCount,
+          warehousesCount: result.warehousesCount,
+          expenseAccountsCount: result.expenseAccountsCount,
         },
         { status: 500 }
       )
