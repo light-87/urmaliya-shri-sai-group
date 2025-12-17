@@ -131,10 +131,14 @@ export async function GET(request: NextRequest) {
 
     // Sort locations by count and get top 10
     const topLocations = Object.entries(locationBreakdown)
-      .sort(([, a], [, b]) => b.count - a.count)
+      .sort(([, a], [, b]) => {
+        const aData = a as { count: number; value: number; profit: number }
+        const bData = b as { count: number; value: number; profit: number }
+        return bData.count - aData.count
+      })
       .slice(0, 10)
       .reduce((acc, [location, data]) => {
-        acc[location] = data
+        acc[location] = data as { count: number; value: number; profit: number }
         return acc
       }, {} as Record<string, { count: number; value: number; profit: number }>)
 
