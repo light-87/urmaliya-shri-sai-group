@@ -25,6 +25,11 @@ interface BackupFile {
   backupType?: string
   inventoryCount?: number
   expenseCount?: number
+  stockCount?: number
+  leadsCount?: number
+  registryCount?: number
+  warehousesCount?: number
+  expenseAccountsCount?: number
   backupDate?: string
 }
 
@@ -196,10 +201,15 @@ export function RestoreManager() {
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          {backup.inventoryCount !== undefined && backup.expenseCount !== undefined ? (
-                            <div className="text-xs">
-                              <div>Inv: {backup.inventoryCount}</div>
-                              <div>Exp: {backup.expenseCount}</div>
+                          {backup.inventoryCount !== undefined || backup.expenseCount !== undefined ? (
+                            <div className="text-xs space-y-0.5">
+                              {backup.inventoryCount !== undefined && <div>Inv: {backup.inventoryCount}</div>}
+                              {backup.expenseCount !== undefined && <div>Exp: {backup.expenseCount}</div>}
+                              {backup.stockCount !== undefined && backup.stockCount > 0 && <div>Stk: {backup.stockCount}</div>}
+                              {backup.leadsCount !== undefined && backup.leadsCount > 0 && <div>Lds: {backup.leadsCount}</div>}
+                              {backup.registryCount !== undefined && backup.registryCount > 0 && <div>Reg: {backup.registryCount}</div>}
+                              {backup.warehousesCount !== undefined && backup.warehousesCount > 0 && <div>Whs: {backup.warehousesCount}</div>}
+                              {backup.expenseAccountsCount !== undefined && backup.expenseAccountsCount > 0 && <div>Acc: {backup.expenseAccountsCount}</div>}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">—</span>

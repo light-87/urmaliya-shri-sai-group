@@ -169,6 +169,9 @@ export interface BackupLog {
   expenseCount: number
   stockCount: number
   leadsCount: number
+  registryCount: number
+  warehousesCount: number
+  expenseAccountsCount: number
   status: string
   errorMessage?: string
 }
