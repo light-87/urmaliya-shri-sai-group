@@ -6,6 +6,42 @@ import { randomUUID } from 'crypto'
 
 export type BackupType = 'MANUAL' | 'AUTOMATIC'
 
+/**
+ * Helper function to fetch ALL rows from a table using pagination
+ * Supabase has a default limit of 1000 rows per query
+ */
+async function fetchAllRows<T>(
+  tableName: string,
+  orderColumn: string = 'createdAt',
+  ascending: boolean = true
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  let allData: T[] = []
+  let from = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .order(orderColumn, { ascending })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...(data as T[])]
+      from += PAGE_SIZE
+      // If we got less than PAGE_SIZE rows, we've reached the end
+      hasMore = data.length === PAGE_SIZE
+    } else {
+      hasMore = false
+    }
+  }
+
+  return allData
+}
+
 interface BackupResult {
   success: boolean
   backupId?: string
@@ -33,25 +69,35 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
   let expenseAccountsCount = 0
 
   try {
-    // Fetch all inventory transactions
-    const { data: inventoryTransactions, error: inventoryError } = await supabase
-      .from('InventoryTransaction')
-      .select('*')
-      .order('date', { ascending: true })
+    // Fetch ALL inventory transactions (using pagination to bypass 1000 row limit)
+    const inventoryTransactions = await fetchAllRows<{
+      id: string
+      date: string
+      warehouse: string
+      bucketType: string
+      action: string
+      quantity: number
+      buyerSeller: string
+      runningTotal: number
+      createdAt: string
+      updatedAt: string
+    }>('InventoryTransaction', 'date', true)
+    inventoryCount = inventoryTransactions.length
 
-    if (inventoryError) throw inventoryError
-    inventoryCount = inventoryTransactions?.length || 0
+    // Fetch ALL expense transactions (using pagination to bypass 1000 row limit)
+    const expenseTransactions = await fetchAllRows<{
+      id: string
+      date: string
+      amount: number
+      account: string
+      type: string
+      name: string
+      createdAt: string
+      updatedAt: string
+    }>('ExpenseTransaction', 'date', true)
+    expenseCount = expenseTransactions.length
 
-    // Fetch all expense transactions
-    const { data: expenseTransactions, error: expenseError } = await supabase
-      .from('ExpenseTransaction')
-      .select('*')
-      .order('date', { ascending: true })
-
-    if (expenseError) throw expenseError
-    expenseCount = expenseTransactions?.length || 0
-
-    // Fetch all stock transactions (if table exists)
+    // Fetch ALL stock transactions (using pagination)
     let stockTransactions: Array<{
       id: string
       date: string
@@ -64,20 +110,13 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       createdAt: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('StockTransaction')
-        .select('*')
-        .order('date', { ascending: true })
-
-      if (!error && data) {
-        stockTransactions = data
-        stockCount = data.length
-      }
+      stockTransactions = await fetchAllRows('StockTransaction', 'date', true)
+      stockCount = stockTransactions.length
     } catch (stockError) {
       console.log('Stock tracking not available yet in backup')
     }
 
-    // Fetch all leads (if table exists)
+    // Fetch ALL leads (using pagination)
     let leads: Array<{
       id: string
       name: string
@@ -94,20 +133,13 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updatedAt: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('createdAt', { ascending: true })
-
-      if (!error && data) {
-        leads = data
-        leadsCount = data.length
-      }
+      leads = await fetchAllRows('leads', 'createdAt', true)
+      leadsCount = leads.length
     } catch (leadsError) {
       console.log('Leads not available yet in backup')
     }
 
-    // Fetch PIN codes for backup (authentication)
+    // Fetch PIN codes for backup (authentication) - small table, pagination not critical
     let pins: Array<{
       id: string
       pin: string
@@ -118,19 +150,12 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updated_at: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('pins')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (!error && data) {
-        pins = data
-      }
+      pins = await fetchAllRows('pins', 'created_at', true)
     } catch (pinError) {
       console.log('Pins not available in backup')
     }
 
-    // Fetch system settings for backup
+    // Fetch system settings for backup - small table, pagination not critical
     let systemSettings: Array<{
       id: string
       key: string
@@ -138,19 +163,12 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updated_at: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .order('key', { ascending: true })
-
-      if (!error && data) {
-        systemSettings = data
-      }
+      systemSettings = await fetchAllRows('system_settings', 'key', true)
     } catch (settingsError) {
       console.log('SystemSettings not available in backup')
     }
 
-    // Fetch registry transactions for backup
+    // Fetch ALL registry transactions (using pagination)
     let registryTransactions: Array<{
       id: string
       transaction_id: string
@@ -181,20 +199,13 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updated_at: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('registry_transactions')
-        .select('*')
-        .order('date', { ascending: true })
-
-      if (!error && data) {
-        registryTransactions = data
-        registryCount = data.length
-      }
+      registryTransactions = await fetchAllRows('registry_transactions', 'date', true)
+      registryCount = registryTransactions.length
     } catch (registryError) {
       console.log('Registry transactions not available in backup')
     }
 
-    // Fetch warehouses for backup
+    // Fetch warehouses for backup - small table, pagination not critical
     let warehouses: Array<{
       id: string
       code: string
@@ -206,20 +217,13 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updated_at: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (!error && data) {
-        warehouses = data
-        warehousesCount = data.length
-      }
+      warehouses = await fetchAllRows('warehouses', 'created_at', true)
+      warehousesCount = warehouses.length
     } catch (warehousesError) {
       console.log('Warehouses not available in backup')
     }
 
-    // Fetch expense accounts for backup
+    // Fetch expense accounts for backup - small table, pagination not critical
     let expenseAccounts: Array<{
       id: string
       code: string
@@ -233,15 +237,8 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       updated_at: string
     }> = []
     try {
-      const { data, error } = await supabase
-        .from('expense_accounts')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (!error && data) {
-        expenseAccounts = data
-        expenseAccountsCount = data.length
-      }
+      expenseAccounts = await fetchAllRows('expense_accounts', 'created_at', true)
+      expenseAccountsCount = expenseAccounts.length
     } catch (expenseAccountsError) {
       console.log('Expense accounts not available in backup')
     }
