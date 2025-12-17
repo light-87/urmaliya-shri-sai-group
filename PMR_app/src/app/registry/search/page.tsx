@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { Search, Download, Filter, X } from 'lucide-react'
+import { ProtectedLayout } from '@/components/Layout/ProtectedLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -130,7 +131,8 @@ export default function RegistrySearchPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ProtectedLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -375,6 +377,7 @@ export default function RegistrySearchPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </ProtectedLayout>
   )
 }
