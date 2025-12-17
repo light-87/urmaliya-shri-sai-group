@@ -33,8 +33,8 @@ export async function PUT(
       )
     }
 
-    // Check permission - ADMIN and EXPENSE_INVENTORY can edit
-    if (session.role === 'INVENTORY_ONLY') {
+    // Check permission - ADMIN, EXPENSE_INVENTORY, and LEADS can edit
+    if (session.role === 'INVENTORY_ONLY' || session.role === 'REGISTRY_MANAGER') {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }
@@ -129,8 +129,8 @@ export async function DELETE(
       )
     }
 
-    // Check permission - ADMIN and EXPENSE_INVENTORY can delete
-    if (session.role === 'INVENTORY_ONLY') {
+    // Check permission - ADMIN, EXPENSE_INVENTORY, and LEADS can delete
+    if (session.role === 'INVENTORY_ONLY' || session.role === 'REGISTRY_MANAGER') {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }

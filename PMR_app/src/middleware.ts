@@ -33,6 +33,13 @@ export async function middleware(request: NextRequest) {
     const { payload } = await jwtVerify(token, SECRET_KEY)
     const role = payload.role as string
 
+    // LEADS role - can only access /leads
+    if (role === 'LEADS') {
+      if (!path.startsWith('/leads')) {
+        return NextResponse.redirect(new URL('/leads', request.url))
+      }
+    }
+
     // Admin-only routes (now includes Daily Report)
     if (
       path.startsWith('/admin') ||
@@ -45,9 +52,16 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    // Leads route - require ADMIN, EXPENSE_INVENTORY, or LEADS
+    if (path.startsWith('/leads')) {
+      if (role !== 'ADMIN' && role !== 'EXPENSE_INVENTORY' && role !== 'LEADS') {
+        return NextResponse.redirect(new URL('/inventory', request.url))
+      }
+    }
+
     // Expense routes - require ADMIN or EXPENSE_INVENTORY
     if (path.startsWith('/expenses')) {
-      if (role === 'INVENTORY_ONLY') {
+      if (role === 'INVENTORY_ONLY' || role === 'LEADS') {
         return NextResponse.redirect(new URL('/inventory', request.url))
       }
     }

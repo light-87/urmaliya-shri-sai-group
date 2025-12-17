@@ -32,7 +32,7 @@ export function Header() {
     { href: '/stockboard', label: 'StockBoard', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'INVENTORY_ONLY'] },
     { href: '/inventory', label: 'Inventory', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'INVENTORY_ONLY'] },
     { href: '/daily-report', label: 'Daily Report', roles: ['ADMIN'] },
-    { href: '/leads', label: 'Leads', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
+    { href: '/leads', label: 'Leads', roles: ['ADMIN', 'EXPENSE_INVENTORY', 'LEADS'] },
     { href: '/expenses', label: 'Expenses', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
     { href: '/search', label: 'Search', roles: ['ADMIN', 'EXPENSE_INVENTORY'] },
     { href: '/dashboard', label: 'Dashboard', roles: ['ADMIN'] },
@@ -48,8 +48,16 @@ export function Header() {
     { href: '/registry/dashboard', label: 'Registry Dashboard', roles: ['ADMIN'] },
   ]
 
+  // Leads-only navigation items
+  const leadsNavItems = [
+    { href: '/leads', label: 'Leads', roles: ['LEADS'] },
+  ]
+
   // Select appropriate nav items based on role and mode
   const getNavItems = () => {
+    if (role === 'LEADS') {
+      return leadsNavItems
+    }
     if (role === 'REGISTRY_MANAGER') {
       return registryNavItems
     }
@@ -69,7 +77,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-6">
-          <Link href="/inventory" className="flex items-center gap-2">
+          <Link href={role === 'LEADS' ? '/leads' : '/inventory'} className="flex items-center gap-2">
             <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center">
               <span className="text-xs font-bold text-primary">USSG</span>
             </div>
