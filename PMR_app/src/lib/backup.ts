@@ -14,6 +14,9 @@ interface BackupResult {
   expenseCount: number
   stockCount: number
   leadsCount: number
+  registryCount: number
+  warehousesCount: number
+  expenseAccountsCount: number
   errorMessage?: string
 }
 
@@ -25,6 +28,9 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
   let expenseCount = 0
   let stockCount = 0
   let leadsCount = 0
+  let registryCount = 0
+  let warehousesCount = 0
+  let expenseAccountsCount = 0
 
   try {
     // Fetch all inventory transactions
@@ -144,6 +150,102 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       console.log('SystemSettings not available in backup')
     }
 
+    // Fetch registry transactions for backup
+    let registryTransactions: Array<{
+      id: string
+      transaction_id: string
+      registration_number: string | null
+      date: string
+      property_location: string
+      seller_name: string
+      buyer_name: string
+      transaction_type: string
+      property_value: number
+      stamp_duty: number
+      registration_fees: number
+      mutation_fees: number
+      documentation_charge: number
+      registrar_office_fees: number
+      operator_cost: number
+      broker_commission: number
+      recommendation_fees: number
+      credit_received: number
+      payment_method: string | null
+      stamp_commission: number
+      total_expenses: number
+      balance_due: number
+      amount_profit: number
+      payment_status: string
+      notes: string | null
+      created_at: string
+      updated_at: string
+    }> = []
+    try {
+      const { data, error } = await supabase
+        .from('registry_transactions')
+        .select('*')
+        .order('date', { ascending: true })
+
+      if (!error && data) {
+        registryTransactions = data
+        registryCount = data.length
+      }
+    } catch (registryError) {
+      console.log('Registry transactions not available in backup')
+    }
+
+    // Fetch warehouses for backup
+    let warehouses: Array<{
+      id: string
+      code: string
+      name: string
+      display_name: string
+      is_active: boolean
+      location: string | null
+      created_at: string
+      updated_at: string
+    }> = []
+    try {
+      const { data, error } = await supabase
+        .from('warehouses')
+        .select('*')
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        warehouses = data
+        warehousesCount = data.length
+      }
+    } catch (warehousesError) {
+      console.log('Warehouses not available in backup')
+    }
+
+    // Fetch expense accounts for backup
+    let expenseAccounts: Array<{
+      id: string
+      code: string
+      name: string
+      display_name: string
+      account_type: string
+      is_active: boolean
+      opening_balance: number
+      current_balance: number
+      created_at: string
+      updated_at: string
+    }> = []
+    try {
+      const { data, error } = await supabase
+        .from('expense_accounts')
+        .select('*')
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        expenseAccounts = data
+        expenseAccountsCount = data.length
+      }
+    } catch (expenseAccountsError) {
+      console.log('Expense accounts not available in backup')
+    }
+
     // Create Excel workbook
     const workbook = XLSX.utils.book_new()
 
@@ -244,6 +346,75 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       XLSX.utils.book_append_sheet(workbook, settingsSheet, 'SystemSettings')
     }
 
+    // Create Registry Transactions sheet (if registry transactions exist)
+    if (registryTransactions.length > 0) {
+      const registryData = registryTransactions.map((txn) => ({
+        ID: txn.id,
+        'Transaction ID': txn.transaction_id,
+        'Registration Number': txn.registration_number || '',
+        Date: format(new Date(txn.date), 'yyyy-MM-dd'),
+        'Property Location': txn.property_location,
+        'Seller Name': txn.seller_name,
+        'Buyer Name': txn.buyer_name,
+        'Transaction Type': txn.transaction_type,
+        'Property Value': txn.property_value,
+        'Stamp Duty': txn.stamp_duty,
+        'Registration Fees': txn.registration_fees,
+        'Mutation Fees': txn.mutation_fees,
+        'Documentation Charge': txn.documentation_charge,
+        'Registrar Office Fees': txn.registrar_office_fees,
+        'Operator Cost': txn.operator_cost,
+        'Broker Commission': txn.broker_commission,
+        'Recommendation Fees': txn.recommendation_fees,
+        'Credit Received': txn.credit_received,
+        'Payment Method': txn.payment_method || '',
+        'Stamp Commission': txn.stamp_commission,
+        'Total Expenses': txn.total_expenses,
+        'Balance Due': txn.balance_due,
+        'Amount Profit': txn.amount_profit,
+        'Payment Status': txn.payment_status,
+        Notes: txn.notes || '',
+        'Created At': format(new Date(txn.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        'Updated At': format(new Date(txn.updated_at), 'yyyy-MM-dd HH:mm:ss'),
+      }))
+      const registrySheet = XLSX.utils.json_to_sheet(registryData)
+      XLSX.utils.book_append_sheet(workbook, registrySheet, 'Registry')
+    }
+
+    // Create Warehouses sheet (if warehouses exist)
+    if (warehouses.length > 0) {
+      const warehousesData = warehouses.map((warehouse) => ({
+        ID: warehouse.id,
+        Code: warehouse.code,
+        Name: warehouse.name,
+        'Display Name': warehouse.display_name,
+        'Is Active': warehouse.is_active ? 'Yes' : 'No',
+        Location: warehouse.location || '',
+        'Created At': format(new Date(warehouse.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        'Updated At': format(new Date(warehouse.updated_at), 'yyyy-MM-dd HH:mm:ss'),
+      }))
+      const warehousesSheet = XLSX.utils.json_to_sheet(warehousesData)
+      XLSX.utils.book_append_sheet(workbook, warehousesSheet, 'Warehouses')
+    }
+
+    // Create Expense Accounts sheet (if expense accounts exist)
+    if (expenseAccounts.length > 0) {
+      const expenseAccountsData = expenseAccounts.map((account) => ({
+        ID: account.id,
+        Code: account.code,
+        Name: account.name,
+        'Display Name': account.display_name,
+        'Account Type': account.account_type,
+        'Is Active': account.is_active ? 'Yes' : 'No',
+        'Opening Balance': account.opening_balance,
+        'Current Balance': account.current_balance,
+        'Created At': format(new Date(account.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        'Updated At': format(new Date(account.updated_at), 'yyyy-MM-dd HH:mm:ss'),
+      }))
+      const expenseAccountsSheet = XLSX.utils.json_to_sheet(expenseAccountsData)
+      XLSX.utils.book_append_sheet(workbook, expenseAccountsSheet, 'ExpenseAccounts')
+    }
+
     // Generate Excel buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
 
@@ -259,12 +430,16 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       .from('backup_logs')
       .insert({
         id: randomUUID(),
-        backup_type: type,
-        drive_file_id: driveFileId,
-        inventory_count: inventoryCount,
-        expense_count: expenseCount,
-        stock_count: stockCount,
-        leads_count: leadsCount,
+        backupDate: new Date().toISOString(),
+        backupType: type,
+        driveFileId: driveFileId,
+        inventoryCount: inventoryCount,
+        expenseCount: expenseCount,
+        stockCount: stockCount,
+        leadsCount: leadsCount,
+        registryCount: registryCount,
+        warehousesCount: warehousesCount,
+        expenseAccountsCount: expenseAccountsCount,
         status: 'SUCCESS',
       })
       .select()
@@ -280,20 +455,27 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       expenseCount,
       stockCount,
       leadsCount,
+      registryCount,
+      warehousesCount,
+      expenseAccountsCount,
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
     // Log failed backup
     await supabase.from('backup_logs').insert({
-        id: randomUUID(),
-      backup_type: type,
-      inventory_count: inventoryCount,
-      expense_count: expenseCount,
-      stock_count: stockCount,
-      leads_count: leadsCount,
+      id: randomUUID(),
+      backupDate: new Date().toISOString(),
+      backupType: type,
+      inventoryCount: inventoryCount,
+      expenseCount: expenseCount,
+      stockCount: stockCount,
+      leadsCount: leadsCount,
+      registryCount: registryCount,
+      warehousesCount: warehousesCount,
+      expenseAccountsCount: expenseAccountsCount,
       status: 'FAILED',
-      error_message: errorMessage,
+      errorMessage: errorMessage,
     })
 
     return {
@@ -302,6 +484,9 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       expenseCount,
       stockCount,
       leadsCount,
+      registryCount,
+      warehousesCount,
+      expenseAccountsCount,
       errorMessage,
     }
   }
@@ -313,15 +498,15 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
 export async function getLastBackupDate(): Promise<Date | null> {
   const { data: lastBackup, error } = await supabase
     .from('backup_logs')
-    .select('backup_date')
+    .select('backupDate')
     .eq('status', 'SUCCESS')
-    .order('backup_date', { ascending: false })
+    .order('backupDate', { ascending: false })
     .limit(1)
     .single()
 
   if (error || !lastBackup) return null
 
-  return lastBackup.backup_date ? new Date(lastBackup.backup_date) : null
+  return lastBackup.backupDate ? new Date(lastBackup.backupDate) : null
 }
 
 /**
@@ -346,7 +531,7 @@ export async function getBackupLogs(limit: number = 20) {
   const { data, error } = await supabase
     .from('backup_logs')
     .select('*')
-    .order('backup_date', { ascending: false })
+    .order('backupDate', { ascending: false })
     .limit(limit)
 
   if (error) throw error

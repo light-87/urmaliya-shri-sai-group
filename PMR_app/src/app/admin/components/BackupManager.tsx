@@ -13,6 +13,11 @@ interface BackupLog {
   driveFileId: string | null
   inventoryCount: number
   expenseCount: number
+  stockCount: number
+  leadsCount: number
+  registryCount: number
+  warehousesCount: number
+  expenseAccountsCount: number
   status: string
   errorMessage: string | null
 }
@@ -56,7 +61,8 @@ export function BackupManager() {
       const data = await response.json()
 
       if (data.success) {
-        setMessage(`Backup created successfully! ${data.inventoryCount} inventory and ${data.expenseCount} expense records backed up.`)
+        const totalRecords = (data.inventoryCount || 0) + (data.expenseCount || 0) + (data.stockCount || 0) + (data.leadsCount || 0) + (data.registryCount || 0) + (data.warehousesCount || 0) + (data.expenseAccountsCount || 0)
+        setMessage(`Backup created successfully! ${totalRecords} total records backed up.`)
         fetchBackupLogs()
       } else {
         setMessage(data.message || 'Backup failed')
@@ -154,7 +160,7 @@ export function BackupManager() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        {log.inventoryCount + log.expenseCount}
+                        {(log.inventoryCount || 0) + (log.expenseCount || 0) + (log.stockCount || 0) + (log.leadsCount || 0) + (log.registryCount || 0) + (log.warehousesCount || 0) + (log.expenseAccountsCount || 0)}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">

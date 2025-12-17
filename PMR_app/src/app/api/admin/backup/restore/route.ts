@@ -95,6 +95,9 @@ export async function POST(request: NextRequest) {
     let leadsData: any[] = []
     let pinsData: any[] = []
     let settingsData: any[] = []
+    let registryData: any[] = []
+    let warehousesData: any[] = []
+    let expenseAccountsData: any[] = []
 
     try {
       const workbook = XLSX.read(backupBuffer, { type: 'buffer' })
@@ -139,7 +142,25 @@ export async function POST(request: NextRequest) {
         settingsData = XLSX.utils.sheet_to_json(settingsSheet)
       }
 
-      console.log(`Found ${inventoryData.length} inventory, ${expenseData.length} expense, ${stockData.length} stock, ${leadsData.length} leads, ${pinsData.length} pins, ${settingsData.length} settings records`)
+      // Read registry transactions data (optional - may not exist in older backups)
+      if (workbook.SheetNames.includes('Registry')) {
+        const registrySheet = workbook.Sheets['Registry']
+        registryData = XLSX.utils.sheet_to_json(registrySheet)
+      }
+
+      // Read warehouses data (optional - may not exist in older backups)
+      if (workbook.SheetNames.includes('Warehouses')) {
+        const warehousesSheet = workbook.Sheets['Warehouses']
+        warehousesData = XLSX.utils.sheet_to_json(warehousesSheet)
+      }
+
+      // Read expense accounts data (optional - may not exist in older backups)
+      if (workbook.SheetNames.includes('ExpenseAccounts')) {
+        const expenseAccountsSheet = workbook.Sheets['ExpenseAccounts']
+        expenseAccountsData = XLSX.utils.sheet_to_json(expenseAccountsSheet)
+      }
+
+      console.log(`Found ${inventoryData.length} inventory, ${expenseData.length} expense, ${stockData.length} stock, ${leadsData.length} leads, ${pinsData.length} pins, ${settingsData.length} settings, ${registryData.length} registry, ${warehousesData.length} warehouses, ${expenseAccountsData.length} expense accounts records`)
     } catch (error) {
       return NextResponse.json(
         {
@@ -196,7 +217,33 @@ export async function POST(request: NextRequest) {
         await supabase.from('system_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       }
 
-      console.log(`Deleted ${inventoryCount || 0} inventory, ${expenseCount || 0} expense, ${stockCount || 0} stock, ${leadsCount || 0} leads, ${pinsCount} pins, ${settingsCount} settings records`)
+      // Delete registry, warehouses, and expense accounts if backup contains them
+      let registryCount = 0
+      let warehousesCount = 0
+      let expenseAccountsCount = 0
+      if (registryData.length > 0) {
+        const { count } = await supabase
+          .from('registry_transactions')
+          .select('*', { count: 'exact', head: true })
+        registryCount = count || 0
+        await supabase.from('registry_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      }
+      if (warehousesData.length > 0) {
+        const { count } = await supabase
+          .from('warehouses')
+          .select('*', { count: 'exact', head: true })
+        warehousesCount = count || 0
+        await supabase.from('warehouses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      }
+      if (expenseAccountsData.length > 0) {
+        const { count } = await supabase
+          .from('expense_accounts')
+          .select('*', { count: 'exact', head: true })
+        expenseAccountsCount = count || 0
+        await supabase.from('expense_accounts').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      }
+
+      console.log(`Deleted ${inventoryCount || 0} inventory, ${expenseCount || 0} expense, ${stockCount || 0} stock, ${leadsCount || 0} leads, ${pinsCount} pins, ${settingsCount} settings, ${registryCount} registry, ${warehousesCount} warehouses, ${expenseAccountsCount} expense accounts records`)
     } catch (error) {
       return NextResponse.json(
         {
@@ -217,6 +264,9 @@ export async function POST(request: NextRequest) {
     let leadsRestored = 0
     let pinsRestored = 0
     let settingsRestored = 0
+    let registryRestored = 0
+    let warehousesRestored = 0
+    let expenseAccountsRestored = 0
     const errors: string[] = []
 
     try {
@@ -378,19 +428,119 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log(`Restored ${inventoryRestored} inventory, ${expensesRestored} expense, ${stockRestored} stock, ${leadsRestored} leads, ${pinsRestored} pins, ${settingsRestored} settings records`)
+      // Restore registry transactions (if present in backup)
+      if (registryData.length > 0) {
+        const sortedRegistry = registryData.sort((a, b) => {
+          const dateA = parseBackupDate(a.Date)
+          const dateB = parseBackupDate(b.Date)
+          return dateA.getTime() - dateB.getTime()
+        })
+
+        for (const row of sortedRegistry) {
+          try {
+            const { error } = await supabase
+              .from('registry_transactions')
+              .insert({
+                id: randomUUID(),
+                transaction_id: row['Transaction ID'] || '',
+                registration_number: row['Registration Number'] || null,
+                date: parseBackupDate(row.Date).toISOString().split('T')[0],
+                property_location: row['Property Location'] || '',
+                seller_name: row['Seller Name'] || '',
+                buyer_name: row['Buyer Name'] || '',
+                transaction_type: row['Transaction Type'] || 'Sale Deed',
+                property_value: Number(row['Property Value']) || 0,
+                stamp_duty: Number(row['Stamp Duty']) || 0,
+                registration_fees: Number(row['Registration Fees']) || 0,
+                mutation_fees: Number(row['Mutation Fees']) || 0,
+                documentation_charge: Number(row['Documentation Charge']) || 0,
+                registrar_office_fees: Number(row['Registrar Office Fees']) || 0,
+                operator_cost: Number(row['Operator Cost']) || 0,
+                broker_commission: Number(row['Broker Commission']) || 0,
+                recommendation_fees: Number(row['Recommendation Fees']) || 0,
+                credit_received: Number(row['Credit Received']) || 0,
+                payment_method: row['Payment Method'] || null,
+                stamp_commission: Number(row['Stamp Commission']) || 0,
+                total_expenses: Number(row['Total Expenses']) || 0,
+                balance_due: Number(row['Balance Due']) || 0,
+                amount_profit: Number(row['Amount Profit']) || 0,
+                payment_status: row['Payment Status'] || 'Pending',
+                notes: row.Notes || null,
+              })
+
+            if (error) throw error
+            registryRestored++
+          } catch (error) {
+            errors.push(`Registry row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
+        }
+      }
+
+      // Restore warehouses (if present in backup)
+      if (warehousesData.length > 0) {
+        for (const row of warehousesData) {
+          try {
+            const { error } = await supabase
+              .from('warehouses')
+              .insert({
+                id: randomUUID(),
+                code: row.Code || '',
+                name: row.Name || '',
+                display_name: row['Display Name'] || '',
+                is_active: row['Is Active'] === 'Yes',
+                location: row.Location || null,
+              })
+
+            if (error) throw error
+            warehousesRestored++
+          } catch (error) {
+            errors.push(`Warehouse row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
+        }
+      }
+
+      // Restore expense accounts (if present in backup)
+      if (expenseAccountsData.length > 0) {
+        for (const row of expenseAccountsData) {
+          try {
+            const { error } = await supabase
+              .from('expense_accounts')
+              .insert({
+                id: randomUUID(),
+                code: row.Code || '',
+                name: row.Name || '',
+                display_name: row['Display Name'] || '',
+                account_type: row['Account Type'] || 'GENERAL',
+                is_active: row['Is Active'] === 'Yes',
+                opening_balance: Number(row['Opening Balance']) || 0,
+                current_balance: Number(row['Current Balance']) || 0,
+              })
+
+            if (error) throw error
+            expenseAccountsRestored++
+          } catch (error) {
+            errors.push(`Expense account row failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
+        }
+      }
+
+      console.log(`Restored ${inventoryRestored} inventory, ${expensesRestored} expense, ${stockRestored} stock, ${leadsRestored} leads, ${pinsRestored} pins, ${settingsRestored} settings, ${registryRestored} registry, ${warehousesRestored} warehouses, ${expenseAccountsRestored} expense accounts records`)
 
       // Create a log entry for the restore operation
       await supabase.from('backup_logs').insert({
-          id: randomUUID(),
-        backup_type: 'MANUAL',
-        drive_file_id: driveFileId,
-        inventory_count: inventoryRestored,
-        expense_count: expensesRestored,
-        stock_count: stockRestored,
-        leads_count: leadsRestored,
+        id: randomUUID(),
+        backupDate: new Date().toISOString(),
+        backupType: 'MANUAL',
+        driveFileId: driveFileId,
+        inventoryCount: inventoryRestored,
+        expenseCount: expensesRestored,
+        stockCount: stockRestored,
+        leadsCount: leadsRestored,
+        registryCount: registryRestored,
+        warehousesCount: warehousesRestored,
+        expenseAccountsCount: expenseAccountsRestored,
         status: 'SUCCESS',
-        error_message: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
+        errorMessage: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
       })
 
       return NextResponse.json({
@@ -402,21 +552,28 @@ export async function POST(request: NextRequest) {
         leadsRestored,
         pinsRestored,
         settingsRestored,
+        registryRestored,
+        warehousesRestored,
+        expenseAccountsRestored,
         currentBackupId: currentBackup.driveFileId,
         errors: errors.length > 0 ? errors : undefined,
       })
     } catch (error) {
       // If restore fails, log the failure
       await supabase.from('backup_logs').insert({
-          id: randomUUID(),
-        backup_type: 'MANUAL',
-        drive_file_id: driveFileId,
-        inventory_count: inventoryRestored,
-        expense_count: expensesRestored,
-        stock_count: stockRestored,
-        leads_count: leadsRestored,
+        id: randomUUID(),
+        backupDate: new Date().toISOString(),
+        backupType: 'MANUAL',
+        driveFileId: driveFileId,
+        inventoryCount: inventoryRestored,
+        expenseCount: expensesRestored,
+        stockCount: stockRestored,
+        leadsCount: leadsRestored,
+        registryCount: registryRestored,
+        warehousesCount: warehousesRestored,
+        expenseAccountsCount: expenseAccountsRestored,
         status: 'FAILED',
-        error_message: error instanceof Error ? error.message : 'Unknown error during restore',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error during restore',
       })
 
       return NextResponse.json(
@@ -430,6 +587,9 @@ export async function POST(request: NextRequest) {
           leadsRestored,
           pinsRestored,
           settingsRestored,
+          registryRestored,
+          warehousesRestored,
+          expenseAccountsRestored,
           currentBackupId: currentBackup.driveFileId,
         },
         { status: 500 }
