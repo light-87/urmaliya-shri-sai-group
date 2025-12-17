@@ -97,7 +97,6 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to fetch registry expenses:', error)
-      alert('Failed to fetch registry expenses')
     } finally {
       setLoading(false)
     }
@@ -148,7 +147,6 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(editingExpense ? 'Expense updated successfully' : 'Expense added successfully')
         setShowAddDialog(false)
         setEditingExpense(null)
         resetForm()
@@ -159,7 +157,6 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to save expense:', error)
-      alert(error instanceof Error ? error.message : 'Failed to save expense')
     }
   }
 
@@ -174,7 +171,6 @@ export default function RegistryExpensesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('Expense deleted successfully')
         fetchExpenses()
         fetchSummary()
       } else {
@@ -182,7 +178,6 @@ export default function RegistryExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to delete expense:', error)
-      alert('Failed to delete expense')
     }
   }
 
