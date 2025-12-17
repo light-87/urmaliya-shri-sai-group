@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { TrendingUp, TrendingDown, DollarSign, FileText, AlertCircle, BarChart3 } from 'lucide-react'
+import { ProtectedLayout } from '@/components/Layout/ProtectedLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -88,16 +89,19 @@ export default function RegistryDashboardPage() {
 
   if (loading || !dashboard) {
     return (
-      <div className="container mx-auto p-6">
-        <p>Loading dashboard...</p>
-      </div>
+      <ProtectedLayout>
+        <div className="container mx-auto p-6">
+          <p>Loading dashboard...</p>
+        </div>
+      </ProtectedLayout>
     )
   }
 
   const { summary } = dashboard
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ProtectedLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -467,6 +471,7 @@ export default function RegistryDashboardPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ProtectedLayout>
   )
 }

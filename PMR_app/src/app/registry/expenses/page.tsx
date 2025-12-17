@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { Plus, Download, Filter, Trash2, Edit } from 'lucide-react'
+import { ProtectedLayout } from '@/components/Layout/ProtectedLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -87,7 +88,7 @@ export default function RegistryExpensesPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [accountFilter, setAccountFilter] = useState('ALL')
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
 
   // Form state
@@ -111,7 +112,7 @@ export default function RegistryExpensesPage() {
       if (dateFrom) params.append('dateFrom', dateFrom)
       if (dateTo) params.append('dateTo', dateTo)
       if (accountFilter !== 'ALL') params.append('account', accountFilter)
-      if (categoryFilter) params.append('category', categoryFilter)
+      if (categoryFilter !== 'ALL') params.append('category', categoryFilter)
       if (typeFilter !== 'ALL') params.append('type', typeFilter)
 
       const response = await fetch(`/api/registry/expenses?${params}`)
@@ -249,14 +250,17 @@ export default function RegistryExpensesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <p>Loading...</p>
-      </div>
+      <ProtectedLayout>
+        <div className="container mx-auto p-6">
+          <p>Loading...</p>
+        </div>
+      </ProtectedLayout>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ProtectedLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -381,7 +385,7 @@ export default function RegistryExpensesPage() {
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="ALL">All Categories</SelectItem>
                   {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -614,6 +618,7 @@ export default function RegistryExpensesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </ProtectedLayout>
   )
 }
