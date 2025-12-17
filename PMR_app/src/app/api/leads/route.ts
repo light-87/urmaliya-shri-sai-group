@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check permission - only ADMIN and EXPENSE_INVENTORY can view leads
-    if (session.role === 'INVENTORY_ONLY') {
+    // Check permission - only ADMIN, EXPENSE_INVENTORY, and LEADS can view leads
+    if (session.role === 'INVENTORY_ONLY' || session.role === 'REGISTRY_MANAGER') {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check permission
-    if (session.role === 'INVENTORY_ONLY') {
+    // Check permission - only ADMIN, EXPENSE_INVENTORY, and LEADS can create leads
+    if (session.role === 'INVENTORY_ONLY' || session.role === 'REGISTRY_MANAGER') {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }

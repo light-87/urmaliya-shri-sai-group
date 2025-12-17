@@ -4,12 +4,13 @@ export enum PinRole {
   EXPENSE_INVENTORY = 'EXPENSE_INVENTORY',
   INVENTORY_ONLY = 'INVENTORY_ONLY',
   REGISTRY_MANAGER = 'REGISTRY_MANAGER',
+  LEADS = 'LEADS',
 }
 
 // Session Types
 export interface SessionData {
   pinId: string
-  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
+  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER' | 'LEADS'
   expiresAt: number
 }
 

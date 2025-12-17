@@ -7,7 +7,7 @@ const SECRET_KEY = new TextEncoder().encode(
 
 export interface SessionData {
   pinId: string
-  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
+  role: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER' | 'LEADS'
   expiresAt: number
 }
 
@@ -57,13 +57,14 @@ export async function deleteSession() {
 // Check permissions based on role hierarchy
 export function hasPermission(
   userRole: SessionData['role'],
-  requiredRole: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER'
+  requiredRole: 'ADMIN' | 'EXPENSE_INVENTORY' | 'INVENTORY_ONLY' | 'REGISTRY_MANAGER' | 'LEADS'
 ): boolean {
   const roleHierarchy = {
     ADMIN: 4,
+    REGISTRY_MANAGER: 3,  // Separate branch - registry access only
     EXPENSE_INVENTORY: 2,
     INVENTORY_ONLY: 1,
-    REGISTRY_MANAGER: 3,  // Separate branch - same level but different access
+    LEADS: 1,  // Minimal access - leads only
   }
 
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole]
