@@ -1,8 +1,10 @@
-# Supabase RLS Security Fix Guide
+# Supabase Security Fix Guide
 
 ## Overview
 
-This guide explains how to fix the Row Level Security (RLS) errors in your Supabase database. The errors indicate that RLS is not enabled on 9 public tables, which is a security requirement for tables exposed via PostgREST.
+This guide explains how to fix all security issues in your Supabase database:
+1. **RLS Errors (FIXED)** - Row Level Security not enabled on 9 public tables
+2. **Function Search Path Warnings** - Functions without fixed search_path (security risk)
 
 ## Affected Tables
 
@@ -18,7 +20,9 @@ The following tables need RLS enabled:
 8. ✗ `backup_logs` - Backup operation logs and metadata
 9. ✗ `leads` - Lead management and customer relationship tracking
 
-## Solution
+## Solutions
+
+### Part 1: RLS Security Fix (COMPLETED)
 
 I've created a comprehensive SQL script that:
 - ✅ Enables RLS on all 9 tables
@@ -26,46 +30,75 @@ I've created a comprehensive SQL script that:
 - ✅ Includes verification queries
 - ✅ Provides detailed documentation
 
-## How to Execute the Fix
+### Part 2: Function Search Path Fix (NEW)
 
-### Step 1: Open Supabase Dashboard
+Additional script to fix function security warnings:
+- ✅ Fixes `update_updated_at_column` function
+- ✅ Fixes `get_next_registry_transaction_id` function
+- ✅ Protects against search path attacks
+- ✅ Includes verification queries
+
+## How to Execute the Fixes
+
+### Fix 1: RLS Security (ALREADY COMPLETED)
+
+You've already run this - all RLS errors are gone! ✅
+
+### Fix 2: Function Search Path Warnings (RUN THIS NOW)
+
+**Step 1: Open Supabase Dashboard**
 
 1. Go to your Supabase project dashboard
 2. Navigate to **SQL Editor** in the left sidebar
 3. Click **"+ New query"** to create a new query
 
-### Step 2: Run the SQL Script
+**Step 2: Run the Function Search Path Fix**
 
-1. Open the file: **`PMR_app/migrations/enable_rls_security.sql`**
+1. Open the file: **`PMR_app/migrations/fix_function_search_path.sql`**
 2. Copy the entire contents of the file
 3. Paste it into the SQL Editor in Supabase
 4. Click **"Run"** or press `Cmd/Ctrl + Enter`
 
-### Step 3: Verify the Results
+**Step 3: Verify the Results**
 
-The script will automatically run verification queries at the end:
-
-1. **RLS Status Check** - Confirms RLS is enabled on all tables
-2. **Policy Check** - Lists all policies created
-
-You should see output like:
+The script will automatically run verification queries showing:
 
 ```
-✅ RLS Security Fix Complete!
-🔒 RLS enabled on 9 tables
-📝 Permissive policies created for all tables
-✓ All security linting errors should now be resolved
+✅ Function Search Path Fix Complete!
+🔒 Fixed 2 functions with secure search_path
+✓ update_updated_at_column - search_path protected
+✓ get_next_registry_transaction_id - search_path protected
 ```
 
-### Step 4: Verify in Supabase Linter
+**Step 4: Verify in Supabase Linter**
 
 1. Go to **Database** → **Linter** in your Supabase dashboard
 2. Run the linter again
-3. All `rls_disabled_in_public` errors should be gone
+3. All `function_search_path_mutable` warnings should be gone! 🎉
 
-## Understanding the Implementation
+## Understanding the Fixes
 
-### Why Permissive Policies?
+### What is the Function Search Path Warning?
+
+The **search_path** determines which schemas PostgreSQL searches when looking for tables, functions, and other objects. Without a fixed search_path, functions can be vulnerable to **search path attacks**.
+
+**The Attack Scenario:**
+1. Attacker creates a schema that appears earlier in the search_path
+2. Attacker creates malicious functions/tables with the same names your functions use
+3. When your function runs, it might use the attacker's objects instead
+4. This can lead to privilege escalation or data theft
+
+**The Fix:**
+We added `SET search_path = public, pg_temp` to both functions:
+- `public` - Only search the public schema where your tables are
+- `pg_temp` - Allow temporary tables (standard practice)
+- The function now ignores the caller's search_path
+
+**Functions Fixed:**
+1. `update_updated_at_column` - Used by triggers on all tables with updated_at
+2. `get_next_registry_transaction_id` - Generates sequential transaction IDs
+
+### Why Permissive RLS Policies?
 
 Your application uses **PIN-based authentication** (not Supabase Auth), where:
 - Users authenticate via PIN codes stored in the `pins` table
@@ -186,19 +219,21 @@ But this will bring back the security linter errors.
 
 ## Files Included
 
-- **`PMR_app/migrations/enable_rls_security.sql`** - Main SQL script to fix RLS issues
+- **`PMR_app/migrations/enable_rls_security.sql`** - RLS security fix (already run)
+- **`PMR_app/migrations/fix_function_search_path.sql`** - Function search path fix (run this next)
 - **`SUPABASE_RLS_FIX_GUIDE.md`** - This documentation file
 
 ## Next Steps
 
-After fixing the RLS issues:
+After fixing all security issues:
 
-1. ✅ Run the SQL script in Supabase
-2. ✅ Verify all linter errors are resolved
-3. ✅ Test all application functionality
-4. 📝 Consider implementing more granular policies in the future
-5. 📝 Document any custom policies you create
-6. 🔒 Keep your service role key secure and never expose it client-side
+1. ✅ RLS fix has been run - all errors gone!
+2. ⏭️ Run the function search path fix now
+3. ✅ Verify all linter warnings are resolved
+4. ✅ Test all application functionality
+5. 📝 Consider implementing more granular policies in the future
+6. 📝 When creating new functions, always add `SET search_path = public, pg_temp`
+7. 🔒 Keep your service role key secure and never expose it client-side
 
 ## Additional Resources
 
