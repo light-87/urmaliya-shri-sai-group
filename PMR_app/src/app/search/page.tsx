@@ -318,11 +318,11 @@ export default function SearchPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ALL">All accounts</SelectItem>
-                      <SelectItem value="CASH">Cash</SelectItem>
-                      <SelectItem value="PRASHANT_GAYDHANE">Prashant Gaydhane</SelectItem>
-                      <SelectItem value="PMR">PMR</SelectItem>
-                      <SelectItem value="KPG_SAVING">KPG Saving</SelectItem>
-                      <SelectItem value="KP_ENTERPRISES">KP Enterprises</SelectItem>
+                      {Object.entries(ACCOUNT_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

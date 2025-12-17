@@ -25,7 +25,7 @@ import type { BucketType, Warehouse, InventorySummary } from '@/types'
 
 const formSchema = z.object({
   date: z.string().min(1, 'Date is required'),
-  warehouse: z.enum(['PALLAVI', 'TULARAM', 'FACTORY']),
+  warehouse: z.enum(['GURH', 'REWA', 'FACTORY']),
   bucketType: z.enum([
     'TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB',
     'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'
@@ -70,7 +70,7 @@ export function AddEntryForm({ open, onClose, onSuccess, summary, editTransactio
     resolver: zodResolver(formSchema),
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
-      warehouse: 'TULARAM',
+      warehouse: 'REWA',
       action: 'STOCK',
       quantity: 0,
       buyerSeller: '',
@@ -102,7 +102,7 @@ export function AddEntryForm({ open, onClose, onSuccess, summary, editTransactio
     if (selectedWarehouse === 'FACTORY') return 0
     const row = summary.find(s => s.bucketType === selectedBucketType)
     if (!row) return 0
-    return selectedWarehouse === 'PALLAVI' ? row.pallavi : row.tularam
+    return selectedWarehouse === 'GURH' ? row.gurh : row.rewa
   }
 
   const onSubmit = async (data: FormData) => {

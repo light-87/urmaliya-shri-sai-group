@@ -25,8 +25,8 @@ export async function GET() {
     }
 
     const { data: pins, error } = await supabase
-      .from('Pin')
-      .select('id, role')
+      .from('pins')
+      .select('id, role, name, is_active')
 
     if (error) throw error
 
@@ -82,9 +82,9 @@ export async function PUT(request: NextRequest) {
 
     // Check if PIN already exists for another role
     const { data: existingPin, error: fetchError } = await supabase
-      .from('Pin')
+      .from('pins')
       .select('*')
-      .eq('pinNumber', newPin)
+      .eq('pin', newPin)
       .single()
 
     if (existingPin && existingPin.role !== role) {
@@ -96,8 +96,8 @@ export async function PUT(request: NextRequest) {
 
     // Update the PIN for the role
     const { error: updateError } = await supabase
-      .from('Pin')
-      .update({ pinNumber: newPin })
+      .from('pins')
+      .update({ pin: newPin })
       .eq('role', role)
 
     if (updateError) throw updateError

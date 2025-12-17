@@ -169,31 +169,31 @@ export async function POST(request: NextRequest) {
         .select('*', { count: 'exact', head: true })
 
       const { count: leadsCount } = await supabase
-        .from('Lead')
+        .from('leads')
         .select('*', { count: 'exact', head: true })
 
       // Delete all data
       await supabase.from('InventoryTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('ExpenseTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('StockTransaction').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('Lead').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
       // Only delete pins and settings if backup contains them (to preserve auth on older backups)
       let pinsCount = 0
       let settingsCount = 0
       if (pinsData.length > 0) {
         const { count } = await supabase
-          .from('Pin')
+          .from('pins')
           .select('*', { count: 'exact', head: true })
         pinsCount = count || 0
-        await supabase.from('Pin').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('pins').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       }
       if (settingsData.length > 0) {
         const { count } = await supabase
-          .from('SystemSettings')
+          .from('system_settings')
           .select('*', { count: 'exact', head: true })
         settingsCount = count || 0
-        await supabase.from('SystemSettings').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('system_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       }
 
       console.log(`Deleted ${inventoryCount || 0} inventory, ${expenseCount || 0} expense, ${stockCount || 0} stock, ${leadsCount || 0} leads, ${pinsCount} pins, ${settingsCount} settings records`)
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
         for (const row of leadsData) {
           try {
             const { error } = await supabase
-              .from('Lead')
+              .from('leads')
               .insert({
           id: randomUUID(),
                 name: row.Name || 'Unknown',
@@ -341,11 +341,13 @@ export async function POST(request: NextRequest) {
         for (const row of pinsData) {
           try {
             const { error } = await supabase
-              .from('Pin')
+              .from('pins')
               .insert({
           id: randomUUID(),
-                pinNumber: row['PIN Number'] || '',
+                pin: row['PIN Number'] || '',
                 role: row.Role || 'INVENTORY_ONLY',
+                name: row.Name || null,
+                is_active: row['Is Active'] === 'Yes',
               })
 
             if (error) throw error
@@ -361,7 +363,7 @@ export async function POST(request: NextRequest) {
         for (const row of settingsData) {
           try {
             const { error } = await supabase
-              .from('SystemSettings')
+              .from('system_settings')
               .insert({
           id: randomUUID(),
                 key: row.Key || '',
@@ -379,16 +381,16 @@ export async function POST(request: NextRequest) {
       console.log(`Restored ${inventoryRestored} inventory, ${expensesRestored} expense, ${stockRestored} stock, ${leadsRestored} leads, ${pinsRestored} pins, ${settingsRestored} settings records`)
 
       // Create a log entry for the restore operation
-      await supabase.from('BackupLog').insert({
+      await supabase.from('backup_logs').insert({
           id: randomUUID(),
-        backupType: 'MANUAL',
-        driveFileId: driveFileId,
-        inventoryCount: inventoryRestored,
-        expenseCount: expensesRestored,
-        stockCount: stockRestored,
-        leadsCount: leadsRestored,
+        backup_type: 'MANUAL',
+        drive_file_id: driveFileId,
+        inventory_count: inventoryRestored,
+        expense_count: expensesRestored,
+        stock_count: stockRestored,
+        leads_count: leadsRestored,
         status: 'SUCCESS',
-        errorMessage: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
+        error_message: errors.length > 0 ? `Restore completed with ${errors.length} errors` : null,
       })
 
       return NextResponse.json({
@@ -405,16 +407,16 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       // If restore fails, log the failure
-      await supabase.from('BackupLog').insert({
+      await supabase.from('backup_logs').insert({
           id: randomUUID(),
-        backupType: 'MANUAL',
-        driveFileId: driveFileId,
-        inventoryCount: inventoryRestored,
-        expenseCount: expensesRestored,
-        stockCount: stockRestored,
-        leadsCount: leadsRestored,
+        backup_type: 'MANUAL',
+        drive_file_id: driveFileId,
+        inventory_count: inventoryRestored,
+        expense_count: expensesRestored,
+        stock_count: stockRestored,
+        leads_count: leadsRestored,
         status: 'FAILED',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error during restore',
+        error_message: error instanceof Error ? error.message : 'Unknown error during restore',
       })
 
       return NextResponse.json(

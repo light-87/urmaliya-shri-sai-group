@@ -232,10 +232,10 @@ async function calculateStockSummary() {
   const summary = []
 
   for (const bucketType of bucketTypes) {
-    const row: { bucketType: BucketType; pallavi: number; tularam: number; total: number } = {
+    const row: { bucketType: BucketType; gurh: number; rewa: number; total: number } = {
       bucketType,
-      pallavi: 0,
-      tularam: 0,
+      gurh: 0,
+      rewa: 0,
       total: 0,
     }
 
@@ -255,15 +255,15 @@ async function calculateStockSummary() {
       } catch {
         row.total = 0
       }
-      // Pallavi and Tularam remain 0 for FREE_DEF
+      // Gurh and Rewa remain 0 for FREE_DEF
       summary.push(row)
       continue
     }
 
     // Get stock from the map instead of making separate queries
-    row.pallavi = stockMap.get(`${bucketType}:PALLAVI`) || 0
-    row.tularam = stockMap.get(`${bucketType}:TULARAM`) || 0
-    row.total = row.pallavi + row.tularam
+    row.gurh = stockMap.get(`${bucketType}:GURH`) || 0
+    row.rewa = stockMap.get(`${bucketType}:REWA`) || 0
+    row.total = row.gurh + row.rewa
     summary.push(row)
   }
 

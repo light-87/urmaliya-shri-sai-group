@@ -89,7 +89,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     }> = []
     try {
       const { data, error } = await supabase
-        .from('Lead')
+        .from('leads')
         .select('*')
         .order('createdAt', { ascending: true })
 
@@ -104,16 +104,18 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     // Fetch PIN codes for backup (authentication)
     let pins: Array<{
       id: string
-      pinNumber: string
+      pin: string
       role: string
-      createdAt: string
-      updatedAt: string
+      name: string | null
+      is_active: boolean
+      created_at: string
+      updated_at: string
     }> = []
     try {
       const { data, error } = await supabase
-        .from('Pin')
+        .from('pins')
         .select('*')
-        .order('createdAt', { ascending: true })
+        .order('created_at', { ascending: true })
 
       if (!error && data) {
         pins = data
@@ -127,11 +129,11 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       id: string
       key: string
       value: string
-      updatedAt: string
+      updated_at: string
     }> = []
     try {
       const { data, error } = await supabase
-        .from('SystemSettings')
+        .from('system_settings')
         .select('*')
         .order('key', { ascending: true })
 
@@ -219,10 +221,12 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     if (pins.length > 0) {
       const pinsData = pins.map((pin) => ({
         ID: pin.id,
-        'PIN Number': pin.pinNumber,
+        'PIN Number': pin.pin,
         Role: pin.role,
-        'Created At': format(new Date(pin.createdAt), 'yyyy-MM-dd HH:mm:ss'),
-        'Updated At': format(new Date(pin.updatedAt), 'yyyy-MM-dd HH:mm:ss'),
+        Name: pin.name || '',
+        'Is Active': pin.is_active ? 'Yes' : 'No',
+        'Created At': format(new Date(pin.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        'Updated At': format(new Date(pin.updated_at), 'yyyy-MM-dd HH:mm:ss'),
       }))
       const pinsSheet = XLSX.utils.json_to_sheet(pinsData)
       XLSX.utils.book_append_sheet(workbook, pinsSheet, 'Pins')
@@ -234,7 +238,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
         ID: setting.id,
         Key: setting.key,
         Value: setting.value,
-        'Updated At': format(new Date(setting.updatedAt), 'yyyy-MM-dd HH:mm:ss'),
+        'Updated At': format(new Date(setting.updated_at), 'yyyy-MM-dd HH:mm:ss'),
       }))
       const settingsSheet = XLSX.utils.json_to_sheet(settingsData)
       XLSX.utils.book_append_sheet(workbook, settingsSheet, 'SystemSettings')
@@ -252,15 +256,15 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
 
     // Log successful backup
     const { data: backupLog, error: logError } = await supabase
-      .from('BackupLog')
+      .from('backup_logs')
       .insert({
         id: randomUUID(),
-        backupType: type,
-        driveFileId,
-        inventoryCount,
-        expenseCount,
-        stockCount,
-        leadsCount,
+        backup_type: type,
+        drive_file_id: driveFileId,
+        inventory_count: inventoryCount,
+        expense_count: expenseCount,
+        stock_count: stockCount,
+        leads_count: leadsCount,
         status: 'SUCCESS',
       })
       .select()
@@ -281,15 +285,15 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
     // Log failed backup
-    await supabase.from('BackupLog').insert({
+    await supabase.from('backup_logs').insert({
         id: randomUUID(),
-      backupType: type,
-      inventoryCount,
-      expenseCount,
-      stockCount,
-      leadsCount,
+      backup_type: type,
+      inventory_count: inventoryCount,
+      expense_count: expenseCount,
+      stock_count: stockCount,
+      leads_count: leadsCount,
       status: 'FAILED',
-      errorMessage,
+      error_message: errorMessage,
     })
 
     return {
@@ -308,16 +312,16 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
  */
 export async function getLastBackupDate(): Promise<Date | null> {
   const { data: lastBackup, error } = await supabase
-    .from('BackupLog')
-    .select('backupDate')
+    .from('backup_logs')
+    .select('backup_date')
     .eq('status', 'SUCCESS')
-    .order('backupDate', { ascending: false })
+    .order('backup_date', { ascending: false })
     .limit(1)
     .single()
 
   if (error || !lastBackup) return null
 
-  return lastBackup.backupDate ? new Date(lastBackup.backupDate) : null
+  return lastBackup.backup_date ? new Date(lastBackup.backup_date) : null
 }
 
 /**
@@ -340,9 +344,9 @@ export async function isBackupNeeded(): Promise<boolean> {
  */
 export async function getBackupLogs(limit: number = 20) {
   const { data, error } = await supabase
-    .from('BackupLog')
+    .from('backup_logs')
     .select('*')
-    .order('backupDate', { ascending: false })
+    .order('backup_date', { ascending: false })
     .limit(limit)
 
   if (error) throw error
