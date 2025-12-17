@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RegistryTransactionType, PaymentStatus } from '@/types'
+import { RegistryTransactionType, RegistryPaymentStatus } from '@/types'
 
 interface SearchFilters {
   dateFrom: string
@@ -47,7 +47,7 @@ interface RegistryTransaction {
   transaction_type: RegistryTransactionType
   property_value: number
   amount_profit: number
-  payment_status: PaymentStatus
+  payment_status: RegistryPaymentStatus
   balance_due: number
   total_expenses: number
   credit_received: number
