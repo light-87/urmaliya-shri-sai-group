@@ -165,7 +165,7 @@ export function AddEntryForm({ open, onClose, onSuccess, summary, editTransactio
           <DialogTitle>
             {isEditMode && editTransaction?.warehouse === 'FACTORY'
               ? 'View Factory Transaction (Read-Only)'
-              : `${isEditMode ? 'Edit' : 'Add'} Bucket Transaction`
+              : `${isEditMode ? 'Edit' : 'Add'} Inventory Transaction`
             }
           </DialogTitle>
         </DialogHeader>
@@ -213,14 +213,14 @@ export function AddEntryForm({ open, onClose, onSuccess, summary, editTransactio
           </div>
 
           <div className="space-y-2">
-            <Label>Bucket Type</Label>
+            <Label>Item Type</Label>
             <Select
               value={selectedBucketType}
               onValueChange={(value) => setValue('bucketType', value as BucketType)}
               disabled={isEditMode && editTransaction?.bucketType === 'FREE_DEF'}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select bucket type" />
+                <SelectValue placeholder="Select item type" />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(BUCKET_TYPE_LABELS).map(([value, label]) => {

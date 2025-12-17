@@ -26,7 +26,7 @@ export function InventoryDashboard({ summary }: InventoryDashboardProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="text-left p-3 font-semibold">Bucket Type</th>
+                <th className="text-left p-3 font-semibold">Item Type</th>
                 <th className="text-center p-3 font-semibold">Gurh</th>
                 <th className="text-center p-3 font-semibold">Rewa</th>
                 <th className="text-center p-3 font-semibold">Total</th>

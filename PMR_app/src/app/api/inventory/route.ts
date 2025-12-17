@@ -206,7 +206,14 @@ async function getCurrentStock(
 // Helper function to calculate stock summary
 async function calculateStockSummary() {
   // Get bucket types and warehouses from types
-  const bucketTypes = ['TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB', 'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'] as BucketType[]
+  const bucketTypes = [
+    'TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB', 'ES', 'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF',
+    // New bucket types
+    'CUMMINS_20L', 'OTHER_20L',
+    // New inventory items
+    'OTHER_ITEMS', 'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
+    'JUMBO_5_MICRON', 'CARTRIDGE_FILTER_022', 'DISPENSER', 'FLOW_METER', 'IBC_ADAPTOR', 'NOZZLE'
+  ] as BucketType[]
 
   // OPTIMIZATION: Fetch all latest inventory transactions in a single query
   // Get the most recent transaction for each bucket+warehouse combination
