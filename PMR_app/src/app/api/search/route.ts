@@ -31,10 +31,11 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build Supabase query with filters
+    // Build Supabase query with filters - EXCLUDE registry expenses
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
+      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
 

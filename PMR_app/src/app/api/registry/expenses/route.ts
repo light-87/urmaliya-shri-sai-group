@@ -50,10 +50,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
 
-    // Build query
+    // Build query - ONLY fetch registry expenses (those with category tags)
     let query = supabase
       .from('ExpenseTransaction')
       .select('*', { count: 'exact' })
+      .like('name', '[%')  // Only expenses with category tags starting with '['
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
 
