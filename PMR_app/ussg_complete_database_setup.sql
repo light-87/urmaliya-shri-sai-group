@@ -120,7 +120,9 @@ VALUES
   ('ICICI', 'ICICI', 'ICICI Bank', 'BANK', true),
   ('CC_CANARA', 'CC Canara', 'CC Canara Bank', 'CREDIT_CARD', true),
   ('CANARA_CURRENT', 'Canara Current', 'Canara Current Account', 'BANK', true),
-  ('SAWALIYA_SETH_MOTORS', 'Sawaliya Seth Motors', 'Sawaliya Seth Motors', 'GENERAL', true)
+  ('SAWALIYA_SETH_MOTORS', 'Sawaliya Seth Motors', 'Sawaliya Seth Motors', 'GENERAL', true),
+  ('VINAY', 'Vinay', 'Vinay', 'BANK', true),
+  ('SACHIN', 'Sachin', 'Sachin', 'BANK', true)
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================================
@@ -175,7 +177,7 @@ CREATE TABLE IF NOT EXISTS "ExpenseTransaction" (
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
   CONSTRAINT valid_account CHECK (account IN (
-    'CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS'
+    'CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
   )),
   CONSTRAINT valid_type CHECK (type IN ('INCOME', 'EXPENSE')),
   CONSTRAINT positive_amount CHECK (amount > 0)
