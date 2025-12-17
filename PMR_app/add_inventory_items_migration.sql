@@ -6,17 +6,18 @@
 -- New Items:
 -- 1. CUMMINS_20L - Cummins 20L bucket (affects FREE_DEF: 20L)
 -- 2. OTHER_20L - Other 20L bucket (affects FREE_DEF: 20L)
--- 3. PP_FILTER - P.P. Filter (no FREE_DEF impact: 0L)
--- 4. WOUND_FILTER - Wound Filter (no FREE_DEF impact: 0L)
--- 5. BAG_FILTER - Bag Filter (no FREE_DEF impact: 0L)
--- 6. UF_FILTER - UF Filter (no FREE_DEF impact: 0L)
--- 7. CHEMICAL_POWDER - Chemical Powder (no FREE_DEF impact: 0L)
--- 8. JUMBO_5_MICRON - Jumbo 5 Micron (no FREE_DEF impact: 0L)
--- 9. CARTRIDGE_FILTER_022 - 0.22 Cartridge Filter (no FREE_DEF impact: 0L)
--- 10. DISPENSER - Dispenser (no FREE_DEF impact: 0L)
--- 11. FLOW_METER - Flow Meter (no FREE_DEF impact: 0L)
--- 12. IBC_ADAPTOR - IBC Adaptor (no FREE_DEF impact: 0L)
--- 13. NOZZLE - Nozzle (no FREE_DEF impact: 0L)
+-- 3. OTHER_ITEMS - Other Items (no FREE_DEF impact: 0L)
+-- 4. PP_FILTER - P.P. Filter (no FREE_DEF impact: 0L)
+-- 5. WOUND_FILTER - Wound Filter (no FREE_DEF impact: 0L)
+-- 6. BAG_FILTER - Bag Filter (no FREE_DEF impact: 0L)
+-- 7. UF_FILTER - UF Filter (no FREE_DEF impact: 0L)
+-- 8. CHEMICAL_POWDER - Chemical Powder (no FREE_DEF impact: 0L)
+-- 9. JUMBO_5_MICRON - Jumbo 5 Micron (no FREE_DEF impact: 0L)
+-- 10. CARTRIDGE_FILTER_022 - 0.22 Cartridge Filter (no FREE_DEF impact: 0L)
+-- 11. DISPENSER - Dispenser (no FREE_DEF impact: 0L)
+-- 12. FLOW_METER - Flow Meter (no FREE_DEF impact: 0L)
+-- 13. IBC_ADAPTOR - IBC Adaptor (no FREE_DEF impact: 0L)
+-- 14. NOZZLE - Nozzle (no FREE_DEF impact: 0L)
 -- ============================================================================
 
 BEGIN;
@@ -36,7 +37,7 @@ ADD CONSTRAINT valid_bucket_type CHECK ("bucketType" IN (
   'CUMMINS_20L', 'OTHER_20L',
 
   -- New inventory items (accessories/filters - no FREE_DEF impact)
-  'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
+  'OTHER_ITEMS', 'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
   'JUMBO_5_MICRON', 'CARTRIDGE_FILTER_022', 'DISPENSER', 'FLOW_METER',
   'IBC_ADAPTOR', 'NOZZLE'
 ));

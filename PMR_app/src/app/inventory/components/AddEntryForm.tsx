@@ -32,7 +32,7 @@ const formSchema = z.object({
     // New bucket types
     'CUMMINS_20L', 'OTHER_20L',
     // New inventory items
-    'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
+    'OTHER_ITEMS', 'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
     'JUMBO_5_MICRON', 'CARTRIDGE_FILTER_022', 'DISPENSER', 'FLOW_METER',
     'IBC_ADAPTOR', 'NOZZLE'
   ]),
