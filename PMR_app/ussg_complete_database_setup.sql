@@ -144,7 +144,11 @@ CREATE TABLE IF NOT EXISTS "InventoryTransaction" (
   CONSTRAINT valid_warehouse CHECK (warehouse IN ('GURH', 'REWA', 'FACTORY')),
   CONSTRAINT valid_bucket_type CHECK ("bucketType" IN (
     'TATA_G', 'TATA_W', 'TATA_HP', 'AL_10_LTR', 'AL', 'BB', 'ES',
-    'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF'
+    'MH', 'MH_10_LTR', 'TATA_10_LTR', 'IBC_TANK', 'ECO', 'INDIAN_OIL_20L', 'FREE_DEF',
+    'CUMMINS_20L', 'OTHER_20L',
+    'PP_FILTER', 'WOUND_FILTER', 'BAG_FILTER', 'UF_FILTER', 'CHEMICAL_POWDER',
+    'JUMBO_5_MICRON', 'CARTRIDGE_FILTER_022', 'DISPENSER', 'FLOW_METER',
+    'IBC_ADAPTOR', 'NOZZLE'
   )),
   CONSTRAINT valid_action CHECK (action IN ('STOCK', 'SELL'))
 );

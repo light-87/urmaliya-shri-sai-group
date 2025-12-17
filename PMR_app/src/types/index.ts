@@ -36,6 +36,21 @@ export enum BucketType {
   ECO = 'ECO',
   INDIAN_OIL_20L = 'INDIAN_OIL_20L',
   FREE_DEF = 'FREE_DEF',
+  // New bucket types (20L buckets)
+  CUMMINS_20L = 'CUMMINS_20L',
+  OTHER_20L = 'OTHER_20L',
+  // New inventory items (accessories/filters)
+  PP_FILTER = 'PP_FILTER',
+  WOUND_FILTER = 'WOUND_FILTER',
+  BAG_FILTER = 'BAG_FILTER',
+  UF_FILTER = 'UF_FILTER',
+  CHEMICAL_POWDER = 'CHEMICAL_POWDER',
+  JUMBO_5_MICRON = 'JUMBO_5_MICRON',
+  CARTRIDGE_FILTER_022 = 'CARTRIDGE_FILTER_022',
+  DISPENSER = 'DISPENSER',
+  FLOW_METER = 'FLOW_METER',
+  IBC_ADAPTOR = 'IBC_ADAPTOR',
+  NOZZLE = 'NOZZLE',
 }
 
 export enum ActionType {
@@ -207,6 +222,21 @@ export const BUCKET_TYPE_LABELS: Record<BucketType, string> = {
   ECO: 'Eco',
   INDIAN_OIL_20L: 'Indian Oil 20 Ltr',
   FREE_DEF: 'Free DEF',
+  // New bucket types
+  CUMMINS_20L: 'Cummins 20L',
+  OTHER_20L: 'Other 20L',
+  // New inventory items
+  PP_FILTER: 'P.P. Filter',
+  WOUND_FILTER: 'Wound Filter',
+  BAG_FILTER: 'Bag Filter',
+  UF_FILTER: 'UF Filter',
+  CHEMICAL_POWDER: 'Chemical Powder',
+  JUMBO_5_MICRON: 'Jumbo 5 Micron',
+  CARTRIDGE_FILTER_022: '0.22 Cartridge Filter',
+  DISPENSER: 'Dispenser',
+  FLOW_METER: 'Flow Meter',
+  IBC_ADAPTOR: 'IBC Adaptor',
+  NOZZLE: 'Nozzle',
 }
 
 // Bucket sizes in liters (0 for non-sellable items)
@@ -225,6 +255,21 @@ export const BUCKET_SIZES: Record<BucketType, number> = {
   ECO: 20,
   INDIAN_OIL_20L: 20,
   FREE_DEF: 0, // Not counted (liters tracked separately in quantity field)
+  // New bucket types (affect FREE_DEF)
+  CUMMINS_20L: 20, // Deducts 20L from FREE_DEF when sold
+  OTHER_20L: 20, // Deducts 20L from FREE_DEF when sold
+  // New inventory items (do NOT affect FREE_DEF)
+  PP_FILTER: 0, // Tracked as units, no FREE_DEF deduction
+  WOUND_FILTER: 0, // Tracked as units, no FREE_DEF deduction
+  BAG_FILTER: 0, // Tracked as units, no FREE_DEF deduction
+  UF_FILTER: 0, // Tracked as units, no FREE_DEF deduction
+  CHEMICAL_POWDER: 0, // Tracked as units, no FREE_DEF deduction
+  JUMBO_5_MICRON: 0, // Tracked as units, no FREE_DEF deduction
+  CARTRIDGE_FILTER_022: 0, // Tracked as units, no FREE_DEF deduction
+  DISPENSER: 0, // Tracked as units, no FREE_DEF deduction
+  FLOW_METER: 0, // Tracked as units, no FREE_DEF deduction
+  IBC_ADAPTOR: 0, // Tracked as units, no FREE_DEF deduction
+  NOZZLE: 0, // Tracked as units, no FREE_DEF deduction
 }
 
 export const ACCOUNT_LABELS: Record<ExpenseAccount, string> = {
