@@ -1,7 +1,7 @@
 {
-  "name": "PMR Industries - Inventory & Expense Manager",
-  "short_name": "PMR Industries",
-  "description": "Manage inventory and expenses for PMR Industries",
+  "name": "USSG - Inventory & Expense Manager",
+  "short_name": "USSG Industries",
+  "description": "Manage inventory and expenses for USSG Industries",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
