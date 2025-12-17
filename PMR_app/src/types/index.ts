@@ -190,6 +190,7 @@ export interface BackupLog {
   expenseAccountsCount: number
   status: string
   errorMessage?: string
+  createdAt?: string
 }
 
 // Form Input Types
