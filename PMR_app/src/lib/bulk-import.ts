@@ -155,13 +155,24 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
           .from('ExpenseTransaction')
           .insert(expenseTransactions)
 
-        if (error) throw error
+        if (error) {
+          console.error('Expense import database error:', error)
+          throw error
+        }
         expensesImported = expenseTransactions.length
       } catch (error) {
+        // Show the actual database error message
+        const errorMessage = error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as any).message)
+          : 'Failed to import expense data'
+
+        console.error('Expense import failed:', errorMessage, error)
         errors.push({
           type: 'expense',
           row: 0,
-          message: error instanceof Error ? error.message : 'Failed to import expense data',
+          message: errorMessage,
         })
       }
     }
