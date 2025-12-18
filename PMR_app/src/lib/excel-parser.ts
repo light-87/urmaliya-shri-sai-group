@@ -151,6 +151,7 @@ const expenseRowSchema = z.object({
   Account: z.string().transform(normalizeAccount),
   Type: z.string().transform(normalizeType),
   Name: z.string().transform(val => val.trim() || 'N/A'), // Allow empty
+  Description: z.string().optional().transform(val => val?.trim() || null), // Optional description
 })
 
 export type InventoryRow = z.infer<typeof inventoryRowSchema>

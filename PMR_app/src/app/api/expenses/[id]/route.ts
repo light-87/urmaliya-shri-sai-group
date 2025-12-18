@@ -13,6 +13,7 @@ const updateExpenseSchema = z.object({
   account: z.nativeEnum(ExpenseAccount).optional(),
   type: z.nativeEnum(TransactionType).optional(),
   name: z.string().min(1).optional(),
+  description: z.string().optional(),
 })
 
 // PUT - Update expense transaction (Admin only)
@@ -62,6 +63,7 @@ export async function PUT(
     if (validatedData.account) updateData.account = validatedData.account
     if (validatedData.type) updateData.type = validatedData.type
     if (validatedData.name) updateData.name = validatedData.name
+    if (validatedData.description !== undefined) updateData.description = validatedData.description
 
     // Update the transaction
     const { data: transaction, error: updateError } = await supabase

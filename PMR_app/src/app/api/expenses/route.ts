@@ -14,6 +14,7 @@ const createExpenseSchema = z.object({
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
   name: z.string().min(1),
+  description: z.string().optional(),
 })
 
 // GET - Fetch expense transactions with pagination
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
         account: validatedData.account,
         type: validatedData.type,
         name: validatedData.name,
+        description: validatedData.description,
       })
       .select()
       .single()

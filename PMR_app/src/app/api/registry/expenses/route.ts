@@ -14,6 +14,7 @@ const registryExpenseSchema = z.object({
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
   name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
 })
 
 // GET: Fetch all registry-related expenses
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
         account: validatedData.account,
         type: validatedData.type,
         name: expenseName,
+        description: validatedData.description,
       })
       .select()
       .single()
@@ -172,6 +174,7 @@ export async function PUT(request: NextRequest) {
     if (validatedData.type) updatePayload.type = validatedData.type
     // Add [REGISTRY] tag to name to distinguish from normal expenses
     if (validatedData.name) updatePayload.name = `[REGISTRY] ${validatedData.name}`
+    if (validatedData.description !== undefined) updatePayload.description = validatedData.description
 
     const { data: expense, error } = await supabase
       .from('ExpenseTransaction')

@@ -92,6 +92,7 @@ export async function createBackup(type: BackupType): Promise<BackupResult> {
       account: string
       type: string
       name: string
+      description: string | null
       createdAt: string
       updatedAt: string
     }>('ExpenseTransaction', 'date', true)

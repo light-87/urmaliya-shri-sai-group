@@ -40,6 +40,7 @@ export function ExpenseTable({
                 <th className="text-left p-3 font-semibold">Account</th>
                 <th className="text-center p-3 font-semibold">Type</th>
                 <th className="text-left p-3 font-semibold">Name</th>
+                <th className="text-left p-3 font-semibold">Description</th>
                 {isAdmin && (
                   <th className="text-center p-3 font-semibold">Actions</th>
                 )}
@@ -49,7 +50,7 @@ export function ExpenseTable({
               {transactions.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 6 : 5}
+                    colSpan={isAdmin ? 7 : 6}
                     className="text-center p-6 text-muted-foreground"
                   >
                     No transactions found
@@ -86,6 +87,9 @@ export function ExpenseTable({
                       </span>
                     </td>
                     <td className="p-3">{transaction.name}</td>
+                    <td className="p-3 text-muted-foreground text-sm max-w-xs truncate">
+                      {transaction.description || '-'}
+                    </td>
                     {isAdmin && (
                       <td className="text-center p-3">
                         <div className="flex items-center justify-center gap-1">

@@ -138,6 +138,7 @@ export async function bulkImportData(data: ParsedExcelData): Promise<ImportResul
           account: row.Account,
           type: row.Type,
           name: row.Name,
+          description: row.Description || null,
         })
       } catch (error) {
         errors.push({

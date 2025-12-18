@@ -318,6 +318,7 @@ export async function POST(request: NextRequest) {
               account: row.Account,
               type: row.Type,
               name: row.Name || 'N/A',
+              description: row.Description || null,
             })
 
           if (error) throw error
