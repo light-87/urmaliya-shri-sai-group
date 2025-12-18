@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ const formSchema = z.object({
   account: z.enum(['CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN']),
   type: z.enum(['INCOME', 'EXPENSE']),
   name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -45,6 +47,7 @@ interface AddExpenseFormProps {
     account: string
     type: string
     name: string
+    description?: string
   } | null
 }
 
@@ -71,6 +74,7 @@ export function AddExpenseForm({ open, onClose, onSuccess, uniqueNames, editTran
       type: 'EXPENSE',
       amount: 0,
       name: '',
+      description: '',
     },
   })
 
@@ -86,6 +90,7 @@ export function AddExpenseForm({ open, onClose, onSuccess, uniqueNames, editTran
       setValue('account', editTransaction.account as ExpenseAccount)
       setValue('type', editTransaction.type as TransactionType)
       setValue('name', editTransaction.name)
+      setValue('description', editTransaction.description || '')
     } else {
       reset()
     }
@@ -245,6 +250,19 @@ export function AddExpenseForm({ open, onClose, onSuccess, uniqueNames, editTran
             )}
             {errors.name && (
               <p className="text-destructive text-sm">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              placeholder="Add details about this transaction"
+              rows={3}
+              {...register('description')}
+            />
+            {errors.description && (
+              <p className="text-destructive text-sm">{errors.description.message}</p>
             )}
           </div>
 

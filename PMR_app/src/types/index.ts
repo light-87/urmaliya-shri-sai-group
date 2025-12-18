@@ -118,6 +118,7 @@ export interface ExpenseTransaction {
   account: ExpenseAccount
   type: TransactionType
   name: string
+  description?: string
   createdAt: string
   updatedAt: string
 }
@@ -209,6 +210,7 @@ export interface ExpenseInput {
   account: ExpenseAccount
   type: TransactionType
   name: string
+  description?: string
 }
 
 // Display Labels

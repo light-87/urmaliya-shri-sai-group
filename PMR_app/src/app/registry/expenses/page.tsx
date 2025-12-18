@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { ExpenseAccount, TransactionType, ACCOUNT_LABELS } from '@/types'
 
 interface RegistryExpense {
@@ -39,6 +40,7 @@ interface RegistryExpense {
   account: ExpenseAccount
   type: TransactionType
   name: string
+  description?: string
   createdAt: string
 }
 
@@ -72,6 +74,7 @@ export default function RegistryExpensesPage() {
     account: ExpenseAccount.CASH,
     type: TransactionType.EXPENSE,
     name: '',
+    description: '',
   })
 
   useEffect(() => {
@@ -191,6 +194,7 @@ export default function RegistryExpensesPage() {
       account: expense.account,
       type: expense.type,
       name: cleanName,
+      description: expense.description || '',
     })
     setEditingExpense(expense)
     setShowAddDialog(true)
@@ -203,6 +207,7 @@ export default function RegistryExpensesPage() {
       account: ExpenseAccount.CASH,
       type: TransactionType.EXPENSE,
       name: '',
+      description: '',
     })
   }
 
@@ -369,6 +374,7 @@ export default function RegistryExpensesPage() {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -378,7 +384,7 @@ export default function RegistryExpensesPage() {
             <TableBody>
               {expenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No expenses found
                   </TableCell>
                 </TableRow>
@@ -391,6 +397,9 @@ export default function RegistryExpensesPage() {
                     <TableRow key={expense.id}>
                       <TableCell>{format(new Date(expense.date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{displayName}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
+                        {expense.description || '-'}
+                      </TableCell>
                       <TableCell>{ACCOUNT_LABELS[expense.account]}</TableCell>
                     <TableCell>
                       <span
@@ -462,6 +471,16 @@ export default function RegistryExpensesPage() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Enter name"
                 required
+              />
+            </div>
+
+            <div>
+              <Label>Description (Optional)</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Add details about this transaction"
+                rows={3}
               />
             </div>
 
