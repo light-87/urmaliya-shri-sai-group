@@ -148,6 +148,7 @@ const expenseRowSchema = z.tuple([
   z.string().transform(normalizeAccount), // Column 2: Account
   z.string().transform(normalizeType), // Column 3: Type
   z.string().transform(val => val.trim() || 'N/A'), // Column 4: Name (allow empty)
+  z.string().optional().transform(val => val?.trim() || null), // Column 5: Description (optional)
 ])
 
 export type InventoryRow = {
@@ -165,6 +166,7 @@ export type ExpenseRow = {
   Account: ExpenseAccount
   Type: TransactionType
   Name: string
+  Description: string | null
 }
 
 export interface ParsedCSVData {
@@ -302,29 +304,31 @@ export function parseCSVFiles(
         return
       }
 
-      // Skip if not enough columns
+      // Skip if not enough columns (minimum 5, but 6 is ok for description)
       if (row.length < 5) {
         errors.push({
           file: 'Expenses',
           row: index + 1,
-          message: `Row has only ${row.length} columns, expected 5: Date, Amount, Account, Type, Name`,
+          message: `Row has only ${row.length} columns, expected at least 5: Date, Amount, Account, Type, Name, Description (optional)`,
         })
         return
       }
 
       try {
-        const validatedRow = expenseRowSchema.parse(row.slice(0, 5))
+        // Take up to 6 columns (description is optional)
+        const validatedRow = expenseRowSchema.parse(row.slice(0, 6))
         expenses.push({
           Date: validatedRow[0],
           Amount: validatedRow[1],
           Account: validatedRow[2],
           Type: validatedRow[3],
           Name: validatedRow[4],
+          Description: validatedRow[5] ?? null,
         })
       } catch (error) {
         if (error instanceof z.ZodError) {
           error.errors.forEach(err => {
-            const fieldNames = ['Date', 'Amount', 'Account', 'Type', 'Name']
+            const fieldNames = ['Date', 'Amount', 'Account', 'Type', 'Name', 'Description']
             const fieldIndex = err.path[0] as number
             errors.push({
               file: 'Expenses',
