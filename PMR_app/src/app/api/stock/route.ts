@@ -169,23 +169,57 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   const totalUreaNeeded = UREA_PER_BATCH_KG * batchCount
   const totalLitersProduced = LITERS_PER_BATCH * batchCount
 
-  // Check if enough Urea is available
-  const ureaStock = await getCurrentStock(StockCategory.UREA)
-  if (ureaStock < totalUreaNeeded) {
+  // Check if this is a backdated transaction for UREA
+  const latestUreaStock = await getCurrentStock(StockCategory.UREA)
+  const { data: latestUreaTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'UREA')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isUreaBackdated = latestUreaTransaction && new Date(data.date) < new Date(latestUreaTransaction.date)
+
+  // Get the correct UREA stock balance based on whether this is backdated
+  const ureaStockAtDate = isUreaBackdated
+    ? await getStockAtDate(StockCategory.UREA, data.date)
+    : latestUreaStock
+
+  // Check if enough Urea is available at that date
+  if (ureaStockAtDate < totalUreaNeeded) {
     return NextResponse.json(
       {
         success: false,
-        message: `Insufficient Urea. Need ${totalUreaNeeded}kg for ${batchCount} batch${batchCount !== 1 ? 'es' : ''}, have ${ureaStock}kg`,
-        currentStock: ureaStock,
+        message: `Insufficient Urea at ${data.date.toLocaleDateString()}. Need ${totalUreaNeeded}kg for ${batchCount} batch${batchCount !== 1 ? 'es' : ''}, have ${ureaStockAtDate}kg`,
+        currentStock: ureaStockAtDate,
       },
       { status: 400 }
     )
   }
 
+  // Check if this is a backdated transaction for FREE_DEF
+  const latestFreeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const { data: latestFreeDEFTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isFreeDEFBackdated = latestFreeDEFTransaction && new Date(data.date) < new Date(latestFreeDEFTransaction.date)
+
+  // Get the correct FREE_DEF stock balance based on whether this is backdated
+  const freeDEFStockAtDate = isFreeDEFBackdated
+    ? await getStockAtDate(StockCategory.FREE_DEF, data.date)
+    : latestFreeDEFStock
+
   // Calculate new running totals
-  const ureaRunningTotal = ureaStock - totalUreaNeeded
-  const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
-  const freeDEFRunningTotal = freeDEFStock + totalLitersProduced
+  const ureaRunningTotal = ureaStockAtDate - totalUreaNeeded
+  const freeDEFRunningTotal = freeDEFStockAtDate + totalLitersProduced
 
   // Create both transactions
   // Note: Finished Goods = Free DEF, so we don't create separate FINISHED_GOODS transaction
@@ -222,6 +256,14 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   if (freeDEFError) throw freeDEFError
 
   const transactions = [ureaTransaction, freeDEFTransaction]
+
+  // If this was a backdated transaction, recalculate all subsequent running totals
+  if (isUreaBackdated) {
+    await recalculateRunningTotalsAfter(StockCategory.UREA, data.date, ureaStockAtDate)
+  }
+  if (isFreeDEFBackdated) {
+    await recalculateRunningTotalsAfter(StockCategory.FREE_DEF, data.date, freeDEFStockAtDate)
+  }
 
   return NextResponse.json({
     success: true,
@@ -315,24 +357,40 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
 
 // Handle regular transactions (ADD_UREA, SELL_FREE_DEF)
 async function handleRegularTransaction(data: z.infer<typeof createStockSchema>) {
-  const currentStock = await getCurrentStock(data.category)
+  // Check if this is a backdated transaction
+  const latestStock = await getCurrentStock(data.category)
+  const { data: latestTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', data.category)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
 
-  // For selling Free DEF, check if enough stock is available
+  const isBackdated = latestTransaction && new Date(data.date) < new Date(latestTransaction.date)
+
+  // Get the correct stock balance based on whether this is backdated
+  const stockAtDate = isBackdated
+    ? await getStockAtDate(data.category, data.date)
+    : latestStock
+
+  // For selling Free DEF, check if enough stock is available at that date
   if (data.type === 'SELL_FREE_DEF' && data.quantity < 0) {
     const quantityToSell = Math.abs(data.quantity)
-    if (currentStock < quantityToSell) {
+    if (stockAtDate < quantityToSell) {
       return NextResponse.json(
         {
           success: false,
-          message: `Insufficient Free DEF. Trying to sell ${quantityToSell}L, have ${currentStock}L`,
-          currentStock,
+          message: `Insufficient Free DEF at ${data.date.toLocaleDateString()}. Trying to sell ${quantityToSell}L, have ${stockAtDate}L`,
+          currentStock: stockAtDate,
         },
         { status: 400 }
       )
     }
   }
 
-  const newRunningTotal = currentStock + data.quantity
+  const newRunningTotal = stockAtDate + data.quantity
 
   // For SELL_FREE_DEF, also create InventoryTransaction
   // Note: Finished Goods = Free DEF, so we don't create separate FINISHED_GOODS transaction
@@ -372,6 +430,11 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
       .single()
     if (inventoryError) throw inventoryError
 
+    // If this was a backdated transaction, recalculate all subsequent running totals
+    if (isBackdated) {
+      await recalculateRunningTotalsAfter(data.category, data.date, stockAtDate)
+    }
+
     return NextResponse.json({
       success: true,
       transactions: [stockTransaction, inventoryTransaction],
@@ -395,6 +458,11 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
     .single()
   if (error) throw error
 
+  // If this was a backdated transaction, recalculate all subsequent running totals
+  if (isBackdated) {
+    await recalculateRunningTotalsAfter(data.category, data.date, stockAtDate)
+  }
+
   return NextResponse.json({
     success: true,
     transaction,
@@ -415,6 +483,53 @@ async function getCurrentStock(category: StockCategory): Promise<number> {
   if (error && error.code !== 'PGRST116') throw error
 
   return lastTransaction?.runningTotal || 0
+}
+
+// Helper function to get stock balance at a specific date (for backdated transactions)
+async function getStockAtDate(category: StockCategory, beforeDate: Date): Promise<number> {
+  const { data: lastTransaction, error } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal, quantity')
+    .eq('category', category)
+    .lt('date', beforeDate.toISOString())
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error
+
+  return lastTransaction?.runningTotal || 0
+}
+
+// Helper function to recalculate running totals for transactions from a given date onwards
+async function recalculateRunningTotalsAfter(category: StockCategory, fromDate: Date, balanceBeforeDate: number) {
+  // Fetch all transactions for this category from the given date onwards
+  const { data: transactions, error: fetchError } = await supabase
+    .from('StockTransaction')
+    .select('*')
+    .eq('category', category)
+    .gte('date', fromDate.toISOString())
+    .order('date', { ascending: true })
+    .order('createdAt', { ascending: true })
+
+  if (fetchError) throw fetchError
+  if (!transactions || transactions.length === 0) return
+
+  // Start with the balance before this date
+  let runningTotal = balanceBeforeDate
+
+  for (const transaction of transactions) {
+    runningTotal += transaction.quantity
+
+    // Update the transaction with the corrected running total
+    const { error: updateError } = await supabase
+      .from('StockTransaction')
+      .update({ runningTotal })
+      .eq('id', transaction.id)
+
+    if (updateError) throw updateError
+  }
 }
 
 // Helper function to calculate stock summary
