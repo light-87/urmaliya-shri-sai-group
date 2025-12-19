@@ -147,12 +147,11 @@ export default function StatementsPage() {
       {statement && (
         <div id="print-content" className="print-only" style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '30px', paddingBottom: '20px', borderBottom: '2px solid #000' }}>
-            <img src="/logo.png" alt="Company Logo" style={{ maxWidth: '168px', height: 'auto' }} />
+            <img src="/logo.png" alt="Company Logo" style={{ maxWidth: '84px', height: 'auto' }} />
             <div style={{ textAlign: 'right', fontSize: '12px', lineHeight: '1.6' }}>
-              <div><strong>Address:</strong> Pimpalgaon Manegao, Maharashtra</div>
-              <div><strong>Email:</strong> pbgaydhane@gmail.com</div>
-              <div><strong>Phone:</strong> +917030847030</div>
-              <div><strong>Phone:</strong> +917020143332</div>
+              <div><strong>Address:</strong> Shop No.05 New Collectorate Campus Rewa (M.P.)</div>
+              <div><strong>Email:</strong> mail@eco-def.com</div>
+              <div><strong>Phone:</strong> 8085237001</div>
             </div>
           </div>
 
