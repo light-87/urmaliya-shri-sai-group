@@ -88,11 +88,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createInventorySchema.parse(body)
 
-    // Get current stock for this bucket+warehouse combination
-    const currentStock = await getCurrentStock(
+    // Check if this is a backdated transaction
+    const latestStock = await getCurrentStock(
       validatedData.bucketType,
       validatedData.warehouse
     )
+    const { data: latestTransaction } = await supabase
+      .from('InventoryTransaction')
+      .select('date')
+      .eq('bucketType', validatedData.bucketType)
+      .eq('warehouse', validatedData.warehouse)
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single()
+
+    const isBackdated = latestTransaction && new Date(validatedData.date) < new Date(latestTransaction.date)
+
+    // Get the correct stock balance based on whether this is backdated
+    const stockAtDate = isBackdated
+      ? await getStockAtDate(validatedData.bucketType, validatedData.warehouse, validatedData.date)
+      : latestStock
 
     // Calculate signed quantity and running total
     const signedQuantity = validatedData.action === 'SELL'
@@ -100,17 +116,17 @@ export async function POST(request: NextRequest) {
       : validatedData.quantity
 
     // Check for overselling (selling more than available stock)
-    if (validatedData.action === 'SELL' && validatedData.quantity > currentStock) {
+    if (validatedData.action === 'SELL' && validatedData.quantity > stockAtDate) {
       // If user hasn't confirmed, return warning
       if (!validatedData.forceOversell) {
         return NextResponse.json(
           {
             success: false,
             requiresConfirmation: true,
-            message: `Warning: Selling ${validatedData.quantity} but only ${currentStock} available in stock. This will result in negative inventory (${currentStock - validatedData.quantity}). Do you want to proceed?`,
-            currentStock,
+            message: `Warning: Selling ${validatedData.quantity} but only ${stockAtDate} available in stock at ${validatedData.date.toLocaleDateString()}. This will result in negative inventory (${stockAtDate - validatedData.quantity}). Do you want to proceed?`,
+            currentStock: stockAtDate,
             requestedQuantity: validatedData.quantity,
-            shortfall: validatedData.quantity - currentStock,
+            shortfall: validatedData.quantity - stockAtDate,
           },
           { status: 400 }
         )
@@ -118,7 +134,7 @@ export async function POST(request: NextRequest) {
       // User confirmed, allow overselling
     }
 
-    const newRunningTotal = currentStock + signedQuantity
+    const newRunningTotal = stockAtDate + signedQuantity
 
     // Create transaction
     const { data: transaction, error: createError } = await supabase
@@ -137,6 +153,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) throw createError
+
+    // If this was a backdated transaction, recalculate all subsequent running totals
+    if (isBackdated) {
+      await recalculateInventoryRunningTotalsAfter(
+        validatedData.bucketType,
+        validatedData.warehouse,
+        validatedData.date,
+        stockAtDate
+      )
+    }
 
     // Auto-update stock tracking (only if StockTransaction table exists)
     const bucketSize = BUCKET_SIZES[validatedData.bucketType]
@@ -201,6 +227,62 @@ async function getCurrentStock(
     .single()
 
   return lastTransaction?.runningTotal || 0
+}
+
+// Helper function to get stock balance at a specific date (for backdated transactions)
+async function getStockAtDate(
+  bucketType: BucketType,
+  warehouse: Warehouse,
+  beforeDate: Date
+): Promise<number> {
+  const { data: lastTransaction } = await supabase
+    .from('InventoryTransaction')
+    .select('runningTotal')
+    .eq('bucketType', bucketType)
+    .eq('warehouse', warehouse)
+    .lt('date', beforeDate.toISOString())
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  return lastTransaction?.runningTotal || 0
+}
+
+// Helper function to recalculate running totals for transactions from a given date onwards
+async function recalculateInventoryRunningTotalsAfter(
+  bucketType: BucketType,
+  warehouse: Warehouse,
+  fromDate: Date,
+  balanceBeforeDate: number
+) {
+  // Fetch all transactions for this bucket+warehouse from the given date onwards
+  const { data: transactions, error: fetchError } = await supabase
+    .from('InventoryTransaction')
+    .select('*')
+    .eq('bucketType', bucketType)
+    .eq('warehouse', warehouse)
+    .gte('date', fromDate.toISOString())
+    .order('date', { ascending: true })
+    .order('createdAt', { ascending: true })
+
+  if (fetchError) throw fetchError
+  if (!transactions || transactions.length === 0) return
+
+  // Start with the balance before this date
+  let runningTotal = balanceBeforeDate
+
+  for (const transaction of transactions) {
+    runningTotal += transaction.quantity
+
+    // Update the transaction with the corrected running total
+    const { error: updateError } = await supabase
+      .from('InventoryTransaction')
+      .update({ runningTotal })
+      .eq('id', transaction.id)
+
+    if (updateError) throw updateError
+  }
 }
 
 // Helper function to calculate stock summary
