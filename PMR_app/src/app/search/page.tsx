@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { formatCurrency } from '@/lib/utils'
 import { ACCOUNT_LABELS } from '@/types'
@@ -295,19 +296,16 @@ export default function SearchPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Customer/Vendor Name (Optional)</Label>
-                  <Select value={selectedName} onValueChange={setSelectedName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All names" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All names</SelectItem>
-                      {names.map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={[
+                      { value: 'ALL', label: 'All names' },
+                      ...names.map((name) => ({ value: name, label: name }))
+                    ]}
+                    value={selectedName}
+                    onValueChange={setSelectedName}
+                    placeholder="All names"
+                    searchPlaceholder="Type to search names..."
+                  />
                 </div>
 
                 <div className="space-y-2">
