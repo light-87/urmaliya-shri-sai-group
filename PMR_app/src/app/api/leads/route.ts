@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Build Supabase query
     let query = supabase
-      .from('Lead')
+      .from('leads')
       .select('*', { count: 'exact' })
       .order('priority', { ascending: false })  // URGENT first
       .order('nextFollowUpDate', { ascending: true, nullsFirst: false })  // Soonest follow-ups first
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Create lead
     const { data: lead, error } = await supabase
-      .from('Lead')
+      .from('leads')
       .insert({
         id: randomUUID(),
         name: validatedData.name,

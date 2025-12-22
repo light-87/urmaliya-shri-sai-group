@@ -47,7 +47,7 @@ export async function PUT(
 
     // Check if lead exists
     const { data: existing, error: fetchError } = await supabase
-      .from('Lead')
+      .from('leads')
       .select('*')
       .eq('id', id)
       .single()
@@ -88,7 +88,7 @@ export async function PUT(
 
     // Update the lead
     const { data: lead, error: updateError } = await supabase
-      .from('Lead')
+      .from('leads')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -141,7 +141,7 @@ export async function DELETE(
 
     // Check if lead exists
     const { data: lead, error: fetchError } = await supabase
-      .from('Lead')
+      .from('leads')
       .select('id')
       .eq('id', id)
       .single()
@@ -155,7 +155,7 @@ export async function DELETE(
 
     // Delete lead
     const { error: deleteError } = await supabase
-      .from('Lead')
+      .from('leads')
       .delete()
       .eq('id', id)
 
