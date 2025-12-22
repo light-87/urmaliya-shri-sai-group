@@ -106,7 +106,7 @@ COMMENT ON COLUMN expense_accounts.account_type IS 'Account type: CASH, BANK, CR
 INSERT INTO expense_accounts (code, name, display_name, account_type, is_active)
 VALUES
   ('CASH', 'Cash', 'Cash', 'CASH', true),
-  ('SHIWAM_TRIPATHI', 'Shiwam Tripathi', 'Shiwam Tripathi', 'BANK', true),
+  ('SHIVAM_TRIPATHI', 'Shivam Tripathi', 'Shivam Tripathi', 'BANK', true),
   ('ICICI', 'ICICI', 'ICICI Bank', 'BANK', true),
   ('CC_CANARA', 'CC Canara', 'CC Canara Bank', 'CREDIT_CARD', true),
   ('CANARA_CURRENT', 'Canara Current', 'Canara Current Account', 'BANK', true),
@@ -292,7 +292,7 @@ SELECT 'Next Registry Transaction ID:' AS info, get_next_registry_transaction_id
 SELECT '✅ USSG Database Setup Complete!' AS status;
 SELECT '📁 Warehouses: 3 (Gurh, Rewa, Factory)' AS details
 UNION ALL
-SELECT '💰 Expense Accounts: 6 (Cash, Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)'
+SELECT '💰 Expense Accounts: 6 (Cash, Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)'
 UNION ALL
 SELECT '📋 Registry System: Ready with auto-calculations';
 

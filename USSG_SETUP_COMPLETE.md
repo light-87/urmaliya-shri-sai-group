@@ -12,7 +12,7 @@
 
 This SQL script creates:
 - **Warehouses table** for USSG (Gurh, Rewa, Factory)
-- **Expense Accounts table** for USSG (Cash, Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)
+- **Expense Accounts table** for USSG (Cash, Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)
 - **Registry Transactions table** with auto-calculated fields:
   - Registrar Office Fees (0.25% of property value) - AUTO
   - Stamp Commission (1.5% of stamp duty) - AUTO

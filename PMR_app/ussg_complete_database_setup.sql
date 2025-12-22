@@ -116,7 +116,7 @@ COMMENT ON TABLE expense_accounts IS 'Expense accounts for USSG financial manage
 INSERT INTO expense_accounts (code, name, display_name, account_type, is_active)
 VALUES
   ('CASH', 'Cash', 'Cash', 'CASH', true),
-  ('SHIWAM_TRIPATHI', 'Shiwam Tripathi', 'Shiwam Tripathi', 'BANK', true),
+  ('SHIVAM_TRIPATHI', 'Shivam Tripathi', 'Shivam Tripathi', 'BANK', true),
   ('ICICI', 'ICICI', 'ICICI Bank', 'BANK', true),
   ('CC_CANARA', 'CC Canara', 'CC Canara Bank', 'CREDIT_CARD', true),
   ('CANARA_CURRENT', 'Canara Current', 'Canara Current Account', 'BANK', true),
@@ -181,7 +181,7 @@ CREATE TABLE IF NOT EXISTS "ExpenseTransaction" (
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
   CONSTRAINT valid_account CHECK (account IN (
-    'CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
+    'CASH', 'SHIVAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
   )),
   CONSTRAINT valid_type CHECK (type IN ('INCOME', 'EXPENSE')),
   CONSTRAINT positive_amount CHECK (amount >= 0)
@@ -509,7 +509,7 @@ SELECT
 UNION ALL
 SELECT '📁 Warehouses: 3 (Gurh, Rewa, Factory)'
 UNION ALL
-SELECT '💰 Expense Accounts: 6 (Cash, Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)'
+SELECT '💰 Expense Accounts: 6 (Cash, Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors)'
 UNION ALL
 SELECT '📋 Registry System: Ready with auto-calculations'
 UNION ALL
@@ -544,7 +544,7 @@ WAREHOUSE SETUP:
 
 EXPENSE ACCOUNTS:
 - CASH: Cash transactions
-- SHIWAM_TRIPATHI: Shiwam Tripathi bank account
+- SHIVAM_TRIPATHI: Shivam Tripathi bank account
 - ICICI: ICICI Bank account
 - CC_CANARA: CC Canara credit card
 - CANARA_CURRENT: Canara Current account

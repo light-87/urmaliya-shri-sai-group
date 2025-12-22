@@ -142,7 +142,7 @@ VALUES (
   'USSG',
   'Urmaliya Shri Sai Group',
   true,
-  '{"warehouses": ["GURH", "REWA", "FACTORY"], "expense_accounts": ["CASH", "SHIWAM_TRIPATHI", "ICICI", "CC_CANARA", "CANARA_CURRENT", "SAWALIYA_SETH_MOTORS"]}'
+  '{"warehouses": ["GURH", "REWA", "FACTORY"], "expense_accounts": ["CASH", "SHIVAM_TRIPATHI", "ICICI", "CC_CANARA", "CANARA_CURRENT", "SAWALIYA_SETH_MOTORS"]}'
 );
 ```
 
@@ -286,7 +286,7 @@ BEGIN
   INSERT INTO expense_accounts (company_id, code, name, display_name, account_type, is_active)
   VALUES
     (ussg_company_id, 'CASH', 'Cash', 'Cash', 'CASH', true),
-    (ussg_company_id, 'SHIWAM_TRIPATHI', 'Shiwam Tripathi', 'Shiwam Tripathi', 'BANK', true),
+    (ussg_company_id, 'SHIVAM_TRIPATHI', 'Shivam Tripathi', 'Shivam Tripathi', 'BANK', true),
     (ussg_company_id, 'ICICI', 'ICICI', 'ICICI Bank', 'BANK', true),
     (ussg_company_id, 'CC_CANARA', 'CC Canara', 'CC Canara Bank', 'CREDIT_CARD', true),
     (ussg_company_id, 'CANARA_CURRENT', 'Canara Current', 'Canara Current Account', 'BANK', true),
@@ -654,7 +654,7 @@ VALUES
   ('PMR Oil Company', 'PMR', 'PMR Oil Company', true,
    '{"warehouses": ["PALLAVI", "TULARAM", "FACTORY"], "expense_accounts": ["CASH", "PRASHANT_GAYDHANE", "PMR", "KPG_SAVING", "KP_ENTERPRISES"]}'),
   ('Urmaliya Shri Sai Group', 'USSG', 'Urmaliya Shri Sai Group', true,
-   '{"warehouses": ["GURH", "REWA", "FACTORY"], "expense_accounts": ["CASH", "SHIWAM_TRIPATHI", "ICICI", "CC_CANARA", "CANARA_CURRENT", "SAWALIYA_SETH_MOTORS"]}')
+   '{"warehouses": ["GURH", "REWA", "FACTORY"], "expense_accounts": ["CASH", "SHIVAM_TRIPATHI", "ICICI", "CC_CANARA", "CANARA_CURRENT", "SAWALIYA_SETH_MOTORS"]}')
 ON CONFLICT (code) DO NOTHING;
 
 -- Step 5: Create Warehouses Table
@@ -752,7 +752,7 @@ BEGIN
   INSERT INTO expense_accounts (company_id, code, name, display_name, account_type, is_active)
   VALUES
     (ussg_id, 'CASH', 'Cash', 'Cash', 'CASH', true),
-    (ussg_id, 'SHIWAM_TRIPATHI', 'Shiwam Tripathi', 'Shiwam Tripathi', 'BANK', true),
+    (ussg_id, 'SHIVAM_TRIPATHI', 'Shivam Tripathi', 'Shivam Tripathi', 'BANK', true),
     (ussg_id, 'ICICI', 'ICICI', 'ICICI Bank', 'BANK', true),
     (ussg_id, 'CC_CANARA', 'CC Canara', 'CC Canara Bank', 'CREDIT_CARD', true),
     (ussg_id, 'CANARA_CURRENT', 'Canara Current', 'Canara Current Account', 'BANK', true),
@@ -904,7 +904,7 @@ ALTER TABLE leads ALTER COLUMN company_id SET NOT NULL;
 - [ ] USSG warehouses (Gurh, Rewa, Factory) inserted
 - [ ] Expense accounts table created
 - [ ] PMR expense accounts inserted
-- [ ] USSG expense accounts (Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors, Cash) inserted
+- [ ] USSG expense accounts (Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors, Cash) inserted
 - [ ] Registry transactions table created
 - [ ] All indexes created
 - [ ] Transaction ID generator function created

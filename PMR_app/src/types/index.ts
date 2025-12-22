@@ -62,7 +62,7 @@ export enum ActionType {
 // JavaScript enums for Zod validation
 export enum ExpenseAccount {
   CASH = 'CASH',
-  SHIWAM_TRIPATHI = 'SHIWAM_TRIPATHI',
+  SHIVAM_TRIPATHI = 'SHIVAM_TRIPATHI',
   ICICI = 'ICICI',
   CC_CANARA = 'CC_CANARA',
   CANARA_CURRENT = 'CANARA_CURRENT',
@@ -283,7 +283,7 @@ export const BUCKET_SIZES: Record<BucketType, number> = {
 
 export const ACCOUNT_LABELS: Record<ExpenseAccount, string> = {
   CASH: 'Cash',
-  SHIWAM_TRIPATHI: 'Shiwam Tripathi',
+  SHIVAM_TRIPATHI: 'Shivam Tripathi',
   ICICI: 'ICICI Bank',
   CC_CANARA: 'CC Canara Bank',
   CANARA_CURRENT: 'Canara Current',
