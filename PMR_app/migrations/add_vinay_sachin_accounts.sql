@@ -14,7 +14,7 @@ ALTER TABLE "ExpenseTransaction" DROP CONSTRAINT IF EXISTS valid_account;
 
 -- Step 3: Add updated constraint with new accounts
 ALTER TABLE "ExpenseTransaction" ADD CONSTRAINT valid_account CHECK (account IN (
-  'CASH', 'SHIWAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
+  'CASH', 'SHIVAM_TRIPATHI', 'ICICI', 'CC_CANARA', 'CANARA_CURRENT', 'SAWALIYA_SETH_MOTORS', 'VINAY', 'SACHIN'
 ));
 
 -- Verification: Check that new accounts were added

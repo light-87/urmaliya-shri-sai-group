@@ -102,8 +102,8 @@ function normalizeAccount(val: string): ExpenseAccount {
   // Map common variations
   const mapping: Record<string, ExpenseAccount> = {
     'CASH': ExpenseAccount.CASH,
-    'SHIWAM_TRIPATHI': ExpenseAccount.SHIWAM_TRIPATHI,
-    'SHIVAM_TRIPATHI': ExpenseAccount.SHIWAM_TRIPATHI, // Old data mapping
+    'SHIVAM_TRIPATHI': ExpenseAccount.SHIVAM_TRIPATHI,
+    'SHIWAM_TRIPATHI': ExpenseAccount.SHIVAM_TRIPATHI, // Old data mapping
     'ICICI': ExpenseAccount.ICICI,
     'ICICI_FIRM': ExpenseAccount.ICICI, // Old data mapping
     'CC_CANARA': ExpenseAccount.CC_CANARA,
@@ -117,7 +117,7 @@ function normalizeAccount(val: string): ExpenseAccount {
     return mapping[normalized]
   }
 
-  throw new Error(`Invalid account: ${val}. Must be one of: CASH, SHIWAM_TRIPATHI, ICICI, CC_CANARA, CANARA_CURRENT, SAWALIYA_SETH_MOTORS, VINAY, SACHIN`)
+  throw new Error(`Invalid account: ${val}. Must be one of: CASH, SHIVAM_TRIPATHI, ICICI, CC_CANARA, CANARA_CURRENT, SAWALIYA_SETH_MOTORS, VINAY, SACHIN`)
 }
 
 // Helper function to normalize transaction types

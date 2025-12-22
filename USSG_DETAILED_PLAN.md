@@ -35,7 +35,7 @@ Transform the current single-company system (PMR) into a multi-tenant platform s
 | Feature | PMR | USSG |
 |---------|-----|------|
 | **Warehouses** | Pallavi, Tularam, Factory | Gurh, Rewa, Factory |
-| **Expense Accounts** | Cash, Prashant Gaydhane, PMR, KPG Saving, KP Enterprises | Cash, Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors |
+| **Expense Accounts** | Cash, Prashant Gaydhane, PMR, KPG Saving, KP Enterprises | Cash, Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors |
 | **Registry Feature** | Not applicable | NEW - Full registry transaction management |
 
 ### Approach
@@ -286,7 +286,7 @@ USSG Company:
 
 **USSG Accounts:**
 1. CASH / Cash / Cash / Type: CASH
-2. SHIWAM_TRIPATHI / Shiwam Tripathi / Type: BANK
+2. SHIVAM_TRIPATHI / Shivam Tripathi / Type: BANK
 3. ICICI / ICICI / ICICI Bank / Type: BANK
 4. CC_CANARA / CC Canara / CC Canara Bank / Type: CREDIT_CARD
 5. CANARA_CURRENT / Canara Current / Canara Current Account / Type: BANK
@@ -1364,7 +1364,7 @@ SET LOCAL app.current_company_id = '[user_company_id]';
 **Flow 2: USSG User Creates Expense**
 1. Login as USSG user
 2. Navigate to expenses
-3. See only USSG accounts (Shiwam Tripathi, ICICI, etc.)
+3. See only USSG accounts (Shivam Tripathi, ICICI, etc.)
 4. Create transaction
 5. Verify saved correctly
 
@@ -1921,7 +1921,7 @@ SET LOCAL app.current_company_id = '[user_company_id]';
 **Expense Accounts:**
 - [ ] Expense accounts table with all entries
 - [ ] PMR uses original accounts
-- [ ] USSG uses: Cash, Shiwam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors
+- [ ] USSG uses: Cash, Shivam Tripathi, ICICI, CC Canara, Canara Current, Sawaliya Seth Motors
 - [ ] Dynamic in UI
 
 **Registry System:**
