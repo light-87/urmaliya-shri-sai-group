@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
-import { format, subMonths, startOfYear, endOfYear, startOfMonth, addMonths, isBefore, isEqual } from 'date-fns'
+import { subMonths } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
       endDate.setUTCHours(23, 59, 59, 999)
     } else if (view === 'last12months') {
       endDate = new Date()
-      startDate = subMonths(endDate, 12)
+      endDate.setUTCHours(23, 59, 59, 999)
+      startDate = subMonths(new Date(), 12)
+      startDate.setUTCHours(0, 0, 0, 0)
     } else if (view === 'alltime') {
       // Get earliest and latest dates from data - EXCLUDE registry expenses
       const { data: earliest, error: earliestError } = await supabase
@@ -67,9 +69,10 @@ export async function GET(request: NextRequest) {
       startDate = earliest?.date ? new Date(earliest.date) : new Date()
       endDate = latest?.date ? new Date(latest.date) : new Date()
     } else {
-      // Default to selected year
-      startDate = startOfYear(new Date(year, 0, 1))
-      endDate = endOfYear(new Date(year, 0, 1))
+      // Default to selected year - use UTC dates to avoid timezone issues
+      // Create dates using UTC to ensure Jan 1 00:00 UTC to Dec 31 23:59 UTC
+      startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0))  // Jan 1, year 00:00:00 UTC
+      endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999))  // Dec 31, year 23:59:59 UTC
     }
 
     // Build Supabase query with filters - EXCLUDE registry expenses
@@ -112,19 +115,35 @@ export async function GET(request: NextRequest) {
     // Calculate monthly data - initialize all months in range to prevent chart gaps
     const monthlyMap = new Map<string, { income: number; expense: number }>()
 
-    // Initialize all months between startDate and endDate
-    let currentMonth = startOfMonth(startDate)
-    const lastMonth = startOfMonth(endDate)
-    while (isBefore(currentMonth, lastMonth) || isEqual(currentMonth, lastMonth)) {
-      const monthKey = format(currentMonth, 'MMM yyyy')
-      monthlyMap.set(monthKey, { income: 0, expense: 0 })
-      currentMonth = addMonths(currentMonth, 1)
+    // Helper to get UTC month key from a date
+    const getMonthKey = (date: Date): string => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      return `${months[date.getUTCMonth()]} ${date.getUTCFullYear()}`
     }
 
-    // Populate with actual transaction data
+    // Initialize all months between startDate and endDate using UTC
+    let currentYear = startDate.getUTCFullYear()
+    let currentMonthNum = startDate.getUTCMonth()
+    const endYear = endDate.getUTCFullYear()
+    const endMonthNum = endDate.getUTCMonth()
+
+    while (currentYear < endYear || (currentYear === endYear && currentMonthNum <= endMonthNum)) {
+      const tempDate = new Date(Date.UTC(currentYear, currentMonthNum, 1))
+      const monthKey = getMonthKey(tempDate)
+      monthlyMap.set(monthKey, { income: 0, expense: 0 })
+
+      currentMonthNum++
+      if (currentMonthNum > 11) {
+        currentMonthNum = 0
+        currentYear++
+      }
+    }
+
+    // Populate with actual transaction data using UTC date parsing
     transactions.forEach(t => {
-      const month = format(new Date(t.date), 'MMM yyyy')
-      const existing = monthlyMap.get(month) || { income: 0, expense: 0 }
+      const txDate = new Date(t.date)
+      const monthKey = getMonthKey(txDate)
+      const existing = monthlyMap.get(monthKey) || { income: 0, expense: 0 }
       const amount = Number(t.amount)
 
       if (t.type === 'INCOME') {
@@ -133,7 +152,7 @@ export async function GET(request: NextRequest) {
         existing.expense += amount
       }
 
-      monthlyMap.set(month, existing)
+      monthlyMap.set(monthKey, existing)
     })
 
     // Convert to array while preserving chronological order

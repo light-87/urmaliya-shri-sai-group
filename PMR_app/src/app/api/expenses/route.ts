@@ -74,10 +74,11 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error, count: total } = await query
     if (error) throw error
 
-    // Get unique names for autocomplete
+    // Get unique names for autocomplete - EXCLUDE registry expenses to be consistent
     const { data: namesData } = await supabase
       .from('ExpenseTransaction')
       .select('name')
+      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('name', { ascending: true })
 
     const uniqueNames = [...new Set(namesData?.map(r => r.name) || [])]
