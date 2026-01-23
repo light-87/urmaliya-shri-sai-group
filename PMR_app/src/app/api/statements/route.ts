@@ -43,17 +43,15 @@ export async function GET(request: NextRequest) {
       .ilike('name', name)  // Case insensitive match
       .order('date', { ascending: true })
 
-    // Apply date filters
+    // Apply date filters - parse explicitly to avoid timezone ambiguity
     if (startDate) {
-      // Use UTC midnight to avoid timezone issues
-      const start = new Date(startDate)
-      start.setUTCHours(0, 0, 0, 0)
+      const [year, month, day] = startDate.split('-').map(Number)
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
       query = query.gte('date', start.toISOString())
     }
     if (endDate) {
-      // Use UTC end of day to include all transactions on that date
-      const end = new Date(endDate)
-      end.setUTCHours(23, 59, 59, 999)
+      const [year, month, day] = endDate.split('-').map(Number)
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.lte('date', end.toISOString())
     }
 

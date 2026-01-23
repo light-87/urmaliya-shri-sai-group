@@ -8,9 +8,19 @@ import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+// Helper to parse date string to UTC Date
+const parseToUTCDate = (str: string): Date => {
+  // Handle both "YYYY-MM-DD" and ISO formats
+  if (str.includes('T')) {
+    return new Date(str)
+  }
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
 // Validation schema for creating stock transaction
 const createStockSchema = z.object({
-  date: z.string().transform(str => new Date(str)),
+  date: z.string().transform(parseToUTCDate),
   type: z.nativeEnum(StockTransactionType),
   category: z.nativeEnum(StockCategory),
   quantity: z.number(),
@@ -67,11 +77,10 @@ export async function GET(request: NextRequest) {
       .order('createdAt', { ascending: false })
 
     if (date) {
-      // Use UTC times to avoid timezone issues
-      const startDate = new Date(date)
-      startDate.setUTCHours(0, 0, 0, 0)
-      const endDate = new Date(date)
-      endDate.setUTCHours(23, 59, 59, 999)
+      // Parse date explicitly to avoid timezone issues
+      const [year, month, day] = date.split('-').map(Number)
+      const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+      const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.gte('date', startDate.toISOString()).lte('date', endDate.toISOString())
     }
     if (category) {

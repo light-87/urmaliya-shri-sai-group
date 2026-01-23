@@ -36,16 +36,18 @@ export async function GET(request: NextRequest) {
     let endDate: Date
 
     if (startDateParam && endDateParam) {
-      // Use UTC times to avoid timezone issues
-      startDate = new Date(startDateParam)
-      startDate.setUTCHours(0, 0, 0, 0)
-      endDate = new Date(endDateParam)
-      endDate.setUTCHours(23, 59, 59, 999)
+      // Parse dates explicitly to avoid timezone ambiguity
+      const [sYear, sMonth, sDay] = startDateParam.split('-').map(Number)
+      startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0, 0))
+      const [eYear, eMonth, eDay] = endDateParam.split('-').map(Number)
+      endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999))
     } else if (view === 'last12months') {
-      endDate = new Date()
-      endDate.setUTCHours(23, 59, 59, 999)
-      startDate = subMonths(new Date(), 12)
-      startDate.setUTCHours(0, 0, 0, 0)
+      const now = new Date()
+      // End date: today at end of day UTC
+      endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      // Start date: 12 months ago at start of day UTC
+      const start = subMonths(now, 12)
+      startDate = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0, 0))
     } else if (view === 'alltime') {
       // Get earliest and latest dates from data - EXCLUDE registry expenses
       const { data: earliest, error: earliestError } = await supabase

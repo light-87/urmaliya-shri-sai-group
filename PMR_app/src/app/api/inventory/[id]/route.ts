@@ -6,9 +6,19 @@ import { BucketType, Warehouse, ActionType, StockCategory, StockTransactionType,
 
 export const dynamic = 'force-dynamic'
 
+// Helper to parse date string to UTC Date
+const parseToUTCDate = (str: string): Date => {
+  // Handle both "YYYY-MM-DD" and ISO formats
+  if (str.includes('T')) {
+    return new Date(str)
+  }
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
 // Validation schema for updating inventory transaction
 const updateInventorySchema = z.object({
-  date: z.string().transform(str => new Date(str)).optional(),
+  date: z.string().transform(parseToUTCDate).optional(),
   warehouse: z.nativeEnum(Warehouse).optional(),
   bucketType: z.nativeEnum(BucketType).optional(),
   action: z.nativeEnum(ActionType).optional(),

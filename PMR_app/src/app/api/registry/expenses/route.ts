@@ -46,15 +46,15 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    // Apply filters with proper UTC date handling
+    // Apply filters - parse dates explicitly to avoid timezone issues
     if (dateFrom) {
-      const start = new Date(dateFrom)
-      start.setUTCHours(0, 0, 0, 0)
+      const [year, month, day] = dateFrom.split('-').map(Number)
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
       query = query.gte('date', start.toISOString())
     }
     if (dateTo) {
-      const end = new Date(dateTo)
-      end.setUTCHours(23, 59, 59, 999)
+      const [year, month, day] = dateTo.split('-').map(Number)
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.lte('date', end.toISOString())
     }
     if (account && account !== 'ALL') {
