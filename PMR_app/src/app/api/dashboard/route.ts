@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
-import { format, subMonths, startOfYear, endOfYear } from 'date-fns'
+import { format, subMonths, startOfYear, endOfYear, startOfMonth, addMonths, isBefore, isEqual } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,9 +36,11 @@ export async function GET(request: NextRequest) {
     let endDate: Date
 
     if (startDateParam && endDateParam) {
+      // Use UTC times to avoid timezone issues
       startDate = new Date(startDateParam)
+      startDate.setUTCHours(0, 0, 0, 0)
       endDate = new Date(endDateParam)
-      endDate.setHours(23, 59, 59, 999)
+      endDate.setUTCHours(23, 59, 59, 999)
     } else if (view === 'last12months') {
       endDate = new Date()
       startDate = subMonths(endDate, 12)
@@ -107,9 +109,19 @@ export async function GET(request: NextRequest) {
       netProfit: totalIncome - totalExpense,
     }
 
-    // Calculate monthly data
+    // Calculate monthly data - initialize all months in range to prevent chart gaps
     const monthlyMap = new Map<string, { income: number; expense: number }>()
 
+    // Initialize all months between startDate and endDate
+    let currentMonth = startOfMonth(startDate)
+    const lastMonth = startOfMonth(endDate)
+    while (isBefore(currentMonth, lastMonth) || isEqual(currentMonth, lastMonth)) {
+      const monthKey = format(currentMonth, 'MMM yyyy')
+      monthlyMap.set(monthKey, { income: 0, expense: 0 })
+      currentMonth = addMonths(currentMonth, 1)
+    }
+
+    // Populate with actual transaction data
     transactions.forEach(t => {
       const month = format(new Date(t.date), 'MMM yyyy')
       const existing = monthlyMap.get(month) || { income: 0, expense: 0 }
@@ -124,6 +136,7 @@ export async function GET(request: NextRequest) {
       monthlyMap.set(month, existing)
     })
 
+    // Convert to array while preserving chronological order
     const monthlyData = Array.from(monthlyMap.entries()).map(([month, data]) => ({
       month,
       income: data.income,

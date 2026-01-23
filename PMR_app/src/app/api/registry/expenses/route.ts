@@ -46,12 +46,16 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    // Apply filters
+    // Apply filters with proper UTC date handling
     if (dateFrom) {
-      query = query.gte('date', dateFrom)
+      const start = new Date(dateFrom)
+      start.setUTCHours(0, 0, 0, 0)
+      query = query.gte('date', start.toISOString())
     }
     if (dateTo) {
-      query = query.lte('date', dateTo)
+      const end = new Date(dateTo)
+      end.setUTCHours(23, 59, 59, 999)
+      query = query.lte('date', end.toISOString())
     }
     if (account && account !== 'ALL') {
       query = query.eq('account', account)

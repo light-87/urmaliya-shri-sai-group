@@ -70,8 +70,9 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
         }
       }
 
-      // If we found a group of 3 (UREA, FREE_DEF, FINISHED_GOODS), group them
-      if (batchGroup.length === 3) {
+      // If we found a group of 2 (UREA, FREE_DEF), group them
+      // Note: FINISHED_GOODS = FREE_DEF, so production batches only create 2 transactions
+      if (batchGroup.length === 2) {
         groupedTransactions.push(batchGroup)
         i = j
       } else {

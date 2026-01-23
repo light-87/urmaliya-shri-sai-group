@@ -34,11 +34,15 @@ export async function GET(request: NextRequest) {
 
     // Apply date filters if provided
     if (startDate) {
-      query = query.gte('date', new Date(startDate).toISOString())
+      // Use UTC midnight to avoid timezone issues
+      const start = new Date(startDate)
+      start.setUTCHours(0, 0, 0, 0)
+      query = query.gte('date', start.toISOString())
     }
     if (endDate) {
+      // Use UTC end of day to include all transactions on that date
       const end = new Date(endDate)
-      end.setHours(23, 59, 59, 999)
+      end.setUTCHours(23, 59, 59, 999)
       query = query.lte('date', end.toISOString())
     }
 

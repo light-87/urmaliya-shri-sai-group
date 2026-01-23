@@ -25,11 +25,16 @@ export async function GET(request: NextRequest) {
       .select('*')
       .like('name', '[%')  // Only expenses with category tags starting with '['
 
+    // Apply filters with proper UTC date handling
     if (dateFrom) {
-      query = query.gte('date', dateFrom)
+      const start = new Date(dateFrom)
+      start.setUTCHours(0, 0, 0, 0)
+      query = query.gte('date', start.toISOString())
     }
     if (dateTo) {
-      query = query.lte('date', dateTo)
+      const end = new Date(dateTo)
+      end.setUTCHours(23, 59, 59, 999)
+      query = query.lte('date', end.toISOString())
     }
 
     const { data: expenses, error } = await query
