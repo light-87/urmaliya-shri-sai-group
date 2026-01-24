@@ -8,9 +8,19 @@ import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+// Helper to parse date string to UTC Date
+const parseToUTCDate = (str: string): Date => {
+  // Handle both "YYYY-MM-DD" and ISO formats
+  if (str.includes('T')) {
+    return new Date(str)
+  }
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
 // Validation schema for creating inventory transaction
 const createInventorySchema = z.object({
-  date: z.string().transform(str => new Date(str)),
+  date: z.string().transform(parseToUTCDate),
   warehouse: z.string() as z.ZodType<Warehouse>,
   bucketType: z.string() as z.ZodType<BucketType>,
   action: z.string() as z.ZodType<ActionType>,
@@ -42,12 +52,11 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
 
-    // Apply filters
+    // Apply filters - parse date explicitly to avoid timezone issues
     if (date) {
-      const startDate = new Date(date)
-      startDate.setHours(0, 0, 0, 0)
-      const endDate = new Date(date)
-      endDate.setHours(23, 59, 59, 999)
+      const [year, month, day] = date.split('-').map(Number)
+      const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+      const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.gte('date', startDate.toISOString()).lte('date', endDate.toISOString())
     }
     if (warehouse) query = query.eq('warehouse', warehouse)

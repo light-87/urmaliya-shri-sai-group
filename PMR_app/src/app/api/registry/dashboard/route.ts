@@ -40,10 +40,12 @@ export async function GET(request: NextRequest) {
         dateTo = endOfMonth(subMonths(new Date(), 1))
         break
       case 'last_3_months':
-        dateFrom = subMonths(new Date(), 3)
+        // Use startOfMonth for proper month boundaries
+        dateFrom = startOfMonth(subMonths(new Date(), 3))
         break
       case 'last_6_months':
-        dateFrom = subMonths(new Date(), 6)
+        // Use startOfMonth for proper month boundaries
+        dateFrom = startOfMonth(subMonths(new Date(), 6))
         break
       case 'year':
         dateFrom = new Date(new Date().getFullYear(), 0, 1)
@@ -150,15 +152,37 @@ export async function GET(request: NextRequest) {
         return acc
       }, {} as Record<string, { count: number; value: number; profit: number }>)
 
-    // Monthly trend (last 6 months)
+    // Monthly trend - dynamically based on selected period
     const monthlyTrend: Record<string, { transactions: number; profit: number; revenue: number }> = {}
 
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(new Date(), i)
+    // Determine how many months to show based on period
+    let monthsToShow = 6 // default
+    switch (period) {
+      case 'current_month':
+        monthsToShow = 1
+        break
+      case 'last_month':
+        monthsToShow = 2
+        break
+      case 'last_3_months':
+        monthsToShow = 4 // 3 months back + current month
+        break
+      case 'last_6_months':
+        monthsToShow = 7 // 6 months back + current month
+        break
+      case 'year':
+        monthsToShow = 12
+        break
+    }
+
+    // Initialize all months in the period (using startOfMonth for proper boundaries)
+    for (let i = monthsToShow - 1; i >= 0; i--) {
+      const monthDate = startOfMonth(subMonths(new Date(), i))
       const monthKey = format(monthDate, 'MMM yyyy')
       monthlyTrend[monthKey] = { transactions: 0, profit: 0, revenue: 0 }
     }
 
+    // Populate with actual data - all transactions will now be included
     transactions?.forEach((t) => {
       const monthKey = format(new Date(t.date), 'MMM yyyy')
       if (monthlyTrend[monthKey]) {

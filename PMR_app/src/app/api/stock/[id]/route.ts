@@ -143,7 +143,60 @@ export async function DELETE(
       )
     }
 
-    // Delete transaction
+    // For PRODUCE_BATCH transactions, we need to delete the paired transaction too
+    // Production creates 2 transactions: UREA (decrease) and FREE_DEF (increase)
+    let pairedTransaction = null
+    if (transaction.type === 'PRODUCE_BATCH') {
+      // Find the paired transaction with same date, type, but different category
+      const { data: paired } = await supabase
+        .from('StockTransaction')
+        .select('*')
+        .eq('type', 'PRODUCE_BATCH')
+        .eq('date', transaction.date)
+        .neq('category', transaction.category)
+        .single()
+
+      pairedTransaction = paired
+    }
+
+    // Validate that deletion won't cause negative stock
+    // Check what the final balance would be after deletion
+    const wouldCauseNegative = await checkIfDeletionCausesNegativeStock(
+      transaction.category,
+      transaction.id,
+      transaction.quantity
+    )
+
+    if (wouldCauseNegative) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Cannot delete this transaction. It would cause negative stock balance for ${transaction.category}.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    // Also check for paired transaction
+    if (pairedTransaction) {
+      const pairedWouldCauseNegative = await checkIfDeletionCausesNegativeStock(
+        pairedTransaction.category,
+        pairedTransaction.id,
+        pairedTransaction.quantity
+      )
+
+      if (pairedWouldCauseNegative) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Cannot delete this production batch. It would cause negative stock balance for ${pairedTransaction.category}.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Delete the main transaction
     const { error: deleteError } = await supabase
       .from('StockTransaction')
       .delete()
@@ -151,12 +204,31 @@ export async function DELETE(
 
     if (deleteError) throw deleteError
 
-    // Recalculate running totals
+    // Delete the paired transaction if it exists
+    if (pairedTransaction) {
+      const { error: pairedDeleteError } = await supabase
+        .from('StockTransaction')
+        .delete()
+        .eq('id', pairedTransaction.id)
+
+      if (pairedDeleteError) {
+        console.error('Failed to delete paired transaction:', pairedDeleteError)
+      }
+    }
+
+    // Recalculate running totals for the deleted transaction's category
     await recalculateRunningTotals(transaction.category)
+
+    // Also recalculate for the paired transaction's category if applicable
+    if (pairedTransaction) {
+      await recalculateRunningTotals(pairedTransaction.category)
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Transaction deleted',
+      message: pairedTransaction
+        ? 'Production batch and paired transactions deleted'
+        : 'Transaction deleted',
     })
   } catch (error) {
     console.error('Stock DELETE error:', error)
@@ -165,6 +237,37 @@ export async function DELETE(
       { status: 500 }
     )
   }
+}
+
+// Helper function to check if deletion would cause negative stock
+async function checkIfDeletionCausesNegativeStock(
+  category: StockCategory,
+  transactionId: string,
+  transactionQuantity: number
+): Promise<boolean> {
+  // Get all transactions for this category, excluding the one being deleted
+  const { data: transactions, error } = await supabase
+    .from('StockTransaction')
+    .select('quantity')
+    .eq('category', category)
+    .neq('id', transactionId)
+    .order('date', { ascending: true })
+    .order('createdAt', { ascending: true })
+
+  if (error || !transactions) {
+    return false // Allow deletion if we can't check
+  }
+
+  // Calculate what the running total would be without this transaction
+  let runningTotal = 0
+  for (const tx of transactions) {
+    runningTotal += tx.quantity
+    if (runningTotal < 0) {
+      return true // Would cause negative balance
+    }
+  }
+
+  return false
 }
 
 // Helper function to recalculate all running totals for a category

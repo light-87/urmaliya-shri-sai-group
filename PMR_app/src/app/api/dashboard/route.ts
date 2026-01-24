@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
-import { format, subMonths, startOfYear, endOfYear } from 'date-fns'
+import { subMonths } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,12 +36,18 @@ export async function GET(request: NextRequest) {
     let endDate: Date
 
     if (startDateParam && endDateParam) {
-      startDate = new Date(startDateParam)
-      endDate = new Date(endDateParam)
-      endDate.setHours(23, 59, 59, 999)
+      // Parse dates explicitly to avoid timezone ambiguity
+      const [sYear, sMonth, sDay] = startDateParam.split('-').map(Number)
+      startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0, 0))
+      const [eYear, eMonth, eDay] = endDateParam.split('-').map(Number)
+      endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999))
     } else if (view === 'last12months') {
-      endDate = new Date()
-      startDate = subMonths(endDate, 12)
+      const now = new Date()
+      // End date: today at end of day UTC
+      endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      // Start date: 12 months ago at start of day UTC
+      const start = subMonths(now, 12)
+      startDate = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0, 0))
     } else if (view === 'alltime') {
       // Get earliest and latest dates from data - EXCLUDE registry expenses
       const { data: earliest, error: earliestError } = await supabase
@@ -65,12 +71,14 @@ export async function GET(request: NextRequest) {
       startDate = earliest?.date ? new Date(earliest.date) : new Date()
       endDate = latest?.date ? new Date(latest.date) : new Date()
     } else {
-      // Default to selected year
-      startDate = startOfYear(new Date(year, 0, 1))
-      endDate = endOfYear(new Date(year, 0, 1))
+      // Default to selected year - use UTC dates to avoid timezone issues
+      // Create dates using UTC to ensure Jan 1 00:00 UTC to Dec 31 23:59 UTC
+      startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0))  // Jan 1, year 00:00:00 UTC
+      endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999))  // Dec 31, year 23:59:59 UTC
     }
 
     // Build Supabase query with filters - EXCLUDE registry expenses
+    // NOTE: Must set high limit to override Supabase default of 1000 rows
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
@@ -78,6 +86,7 @@ export async function GET(request: NextRequest) {
       .gte('date', startDate.toISOString())
       .lte('date', endDate.toISOString())
       .order('date', { ascending: true })
+      .limit(10000)  // Override default 1000 limit to get all transactions
 
     // Add account filter if accounts are specified (not "ALL")
     if (accountsParam && accountsParam !== 'ALL') {
@@ -87,6 +96,47 @@ export async function GET(request: NextRequest) {
 
     const { data: transactions, error } = await query
     if (error) throw error
+
+    // ===== DEBUG: Account-specific investigation =====
+    console.log('\n========== DASHBOARD DEBUG ==========')
+    console.log('Year:', year, 'Accounts Param:', accountsParam)
+    console.log('Total transactions returned:', transactions.length)
+
+    // Check what accounts are in the returned data
+    const accountCounts: Record<string, number> = {}
+    transactions.forEach(t => {
+      accountCounts[t.account] = (accountCounts[t.account] || 0) + 1
+    })
+    console.log('Transactions by account:', accountCounts)
+
+    // Check December transactions by account
+    const decemberByAccount: Record<string, number> = {}
+    transactions.filter(t => t.date.includes('-12-')).forEach(t => {
+      decemberByAccount[t.account] = (decemberByAccount[t.account] || 0) + 1
+    })
+    console.log('December transactions by account:', decemberByAccount)
+
+    // Direct query for Cash December
+    const { data: cashDec } = await supabase
+      .from('ExpenseTransaction')
+      .select('date, name, amount, type')
+      .eq('account', 'CASH')
+      .gte('date', `${year}-12-01`)
+      .lte('date', `${year}-12-31T23:59:59Z`)
+      .limit(5)
+    console.log('Direct CASH December query:', cashDec?.length, cashDec)
+
+    // Direct query for Shivam December
+    const { data: shivamDec } = await supabase
+      .from('ExpenseTransaction')
+      .select('date, name, amount, type')
+      .eq('account', 'SHIVAM_TRIPATHI')
+      .gte('date', `${year}-12-01`)
+      .lte('date', `${year}-12-31T23:59:59Z`)
+      .limit(5)
+    console.log('Direct SHIVAM_TRIPATHI December query:', shivamDec?.length, shivamDec)
+    console.log('========== END DEBUG ==========\n')
+    // ===== END DEBUG =====
 
     // Calculate summary
     let totalIncome = 0
@@ -107,12 +157,48 @@ export async function GET(request: NextRequest) {
       netProfit: totalIncome - totalExpense,
     }
 
-    // Calculate monthly data
+    // Calculate monthly data - initialize all months in range to prevent chart gaps
     const monthlyMap = new Map<string, { income: number; expense: number }>()
 
+    // Helper to get UTC month key from a date
+    const getMonthKey = (date: Date): string => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      return `${months[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+    }
+
+    // Initialize all months between startDate and endDate using UTC
+    let currentYear = startDate.getUTCFullYear()
+    let currentMonthNum = startDate.getUTCMonth()
+    const endYear = endDate.getUTCFullYear()
+    const endMonthNum = endDate.getUTCMonth()
+
+    while (currentYear < endYear || (currentYear === endYear && currentMonthNum <= endMonthNum)) {
+      const tempDate = new Date(Date.UTC(currentYear, currentMonthNum, 1))
+      const monthKey = getMonthKey(tempDate)
+      monthlyMap.set(monthKey, { income: 0, expense: 0 })
+
+      currentMonthNum++
+      if (currentMonthNum > 11) {
+        currentMonthNum = 0
+        currentYear++
+      }
+    }
+
+    // Helper to parse date from database - handles both ISO and simple date formats
+    const parseDbDate = (dateStr: string): Date => {
+      if (dateStr.includes('T')) {
+        return new Date(dateStr)
+      }
+      // Simple date format "YYYY-MM-DD" - parse explicitly as UTC
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+    }
+
+    // Populate with actual transaction data using explicit UTC date parsing
     transactions.forEach(t => {
-      const month = format(new Date(t.date), 'MMM yyyy')
-      const existing = monthlyMap.get(month) || { income: 0, expense: 0 }
+      const txDate = parseDbDate(t.date)
+      const monthKey = getMonthKey(txDate)
+      const existing = monthlyMap.get(monthKey) || { income: 0, expense: 0 }
       const amount = Number(t.amount)
 
       if (t.type === 'INCOME') {
@@ -121,9 +207,10 @@ export async function GET(request: NextRequest) {
         existing.expense += amount
       }
 
-      monthlyMap.set(month, existing)
+      monthlyMap.set(monthKey, existing)
     })
 
+    // Convert to array while preserving chronological order
     const monthlyData = Array.from(monthlyMap.entries()).map(([month, data]) => ({
       month,
       income: data.income,

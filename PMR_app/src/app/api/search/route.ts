@@ -32,19 +32,26 @@ export async function GET(request: NextRequest) {
     const name = searchParams.get('name')
 
     // Build Supabase query with filters - EXCLUDE registry expenses
+    // NOTE: Must set high limit to override Supabase default of 1000 rows
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
       .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
+      .limit(10000)  // Override default 1000 limit
 
     if (startDate) {
-      query = query.gte('date', new Date(startDate).toISOString())
+      // Parse date explicitly to avoid timezone ambiguity
+      // Date inputs are in YYYY-MM-DD format
+      const [year, month, day] = startDate.split('-').map(Number)
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+      query = query.gte('date', start.toISOString())
     }
     if (endDate) {
-      const end = new Date(endDate)
-      end.setHours(23, 59, 59, 999)
+      // Parse date explicitly to avoid timezone ambiguity
+      const [year, month, day] = endDate.split('-').map(Number)
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.lte('date', end.toISOString())
     }
     if (account) {

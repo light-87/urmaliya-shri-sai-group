@@ -7,9 +7,19 @@ import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+// Helper to parse date string to UTC Date
+const parseToUTCDate = (str: string): Date => {
+  // Handle both "YYYY-MM-DD" and ISO formats
+  if (str.includes('T')) {
+    return new Date(str)
+  }
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
 // Validation schema for creating expense transaction
 const createExpenseSchema = z.object({
-  date: z.string().transform(str => new Date(str)),
+  date: z.string().transform(parseToUTCDate),
   amount: z.number().min(0),
   account: z.nativeEnum(ExpenseAccount),
   type: z.nativeEnum(TransactionType),
@@ -54,13 +64,15 @@ export async function GET(request: NextRequest) {
       .order('createdAt', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 
-    // Apply filters
+    // Apply filters - parse dates explicitly to avoid timezone issues
     if (startDate) {
-      query = query.gte('date', new Date(startDate).toISOString())
+      const [year, month, day] = startDate.split('-').map(Number)
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+      query = query.gte('date', start.toISOString())
     }
     if (endDate) {
-      const end = new Date(endDate)
-      end.setHours(23, 59, 59, 999)
+      const [year, month, day] = endDate.split('-').map(Number)
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.lte('date', end.toISOString())
     }
     if (account) query = query.eq('account', account)
@@ -70,10 +82,11 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error, count: total } = await query
     if (error) throw error
 
-    // Get unique names for autocomplete
+    // Get unique names for autocomplete - EXCLUDE registry expenses to be consistent
     const { data: namesData } = await supabase
       .from('ExpenseTransaction')
       .select('name')
+      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('name', { ascending: true })
 
     const uniqueNames = [...new Set(namesData?.map(r => r.name) || [])]

@@ -7,9 +7,18 @@ import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+// Helper to parse date string to UTC Date
+const parseToUTCDate = (str: string): Date => {
+  if (str.includes('T')) {
+    return new Date(str)
+  }
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
+
 // Validation schema for creating registry transaction
 const createRegistrySchema = z.object({
-  date: z.string().transform(str => new Date(str)),
+  date: z.string().transform(parseToUTCDate),
   registrationNumber: z.string().optional(),
   propertyLocation: z.string().min(1, 'Property location is required'),
   sellerName: z.string().min(1, 'Seller name is required'),
@@ -78,13 +87,15 @@ export async function GET(request: NextRequest) {
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .range((page - 1) * limit, page * limit - 1)
 
-    // Apply filters
+    // Apply filters - parse dates explicitly to avoid timezone issues
     if (startDate) {
-      query = query.gte('date', new Date(startDate).toISOString())
+      const [year, month, day] = startDate.split('-').map(Number)
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+      query = query.gte('date', start.toISOString())
     }
     if (endDate) {
-      const end = new Date(endDate)
-      end.setHours(23, 59, 59, 999)
+      const [year, month, day] = endDate.split('-').map(Number)
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
       query = query.lte('date', end.toISOString())
     }
     if (paymentStatus) {
