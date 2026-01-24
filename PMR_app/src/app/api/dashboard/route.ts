@@ -165,12 +165,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Helper to parse date from database - handles both ISO and simple date formats
+    // Helper to parse date from database - handles multiple date formats
+    // PostgreSQL returns: "2026-01-01 00:00:00+00" (space, not T)
+    // ISO format: "2026-01-01T00:00:00.000Z" (has T)
+    // Simple format: "2026-01-01"
     const parseDbDate = (dateStr: string): Date => {
-      if (dateStr.includes('T')) {
-        return new Date(dateStr)
+      // Handle PostgreSQL timestamp format: "2026-01-01 00:00:00+00"
+      // Convert space to 'T' to make it ISO-compatible
+      const normalized = dateStr.replace(' ', 'T')
+
+      // Now parse as ISO format - this handles both:
+      // - Original ISO: "2026-01-01T00:00:00.000Z"
+      // - Converted PostgreSQL: "2026-01-01T00:00:00+00"
+      // - Simple format: "2026-01-01" (will be parsed as local, but we extract UTC parts)
+      const date = new Date(normalized)
+
+      // If it's a valid date, return it
+      if (!isNaN(date.getTime())) {
+        return date
       }
-      // Simple date format "YYYY-MM-DD" - parse explicitly as UTC
+
+      // Fallback: try parsing as simple YYYY-MM-DD
       const [year, month, day] = dateStr.split('-').map(Number)
       return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
     }
