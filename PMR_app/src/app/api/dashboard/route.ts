@@ -141,9 +141,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Populate with actual transaction data using UTC date parsing
+    // Helper to parse date from database - handles both ISO and simple date formats
+    const parseDbDate = (dateStr: string): Date => {
+      if (dateStr.includes('T')) {
+        return new Date(dateStr)
+      }
+      // Simple date format "YYYY-MM-DD" - parse explicitly as UTC
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+    }
+
+    // Populate with actual transaction data using explicit UTC date parsing
     transactions.forEach(t => {
-      const txDate = new Date(t.date)
+      const txDate = parseDbDate(t.date)
       const monthKey = getMonthKey(txDate)
       const existing = monthlyMap.get(monthKey) || { income: 0, expense: 0 }
       const amount = Number(t.amount)
