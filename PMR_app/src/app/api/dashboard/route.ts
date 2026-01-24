@@ -206,12 +206,37 @@ export async function GET(request: NextRequest) {
       expense: m.expense,
     }))
 
+    // Debug: collect December transactions info
+    const decemberDebug = transactions
+      .filter(t => {
+        const d = parseDbDate(t.date)
+        return d.getUTCMonth() === 11 // December
+      })
+      .slice(0, 5)
+      .map(t => ({
+        date: t.date,
+        parsedMonth: parseDbDate(t.date).getUTCMonth(),
+        parsedYear: parseDbDate(t.date).getUTCFullYear(),
+        type: t.type,
+        amount: t.amount,
+        name: t.name
+      }))
+
     return NextResponse.json({
       success: true,
       summary,
       monthlyData,
       accountBreakdown,
       trendData,
+      _debug: {
+        queryRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
+        totalTransactions: transactions.length,
+        sampleDates: transactions.slice(0, 3).map(t => t.date),
+        decemberTransactions: decemberDebug,
+      }
     })
   } catch (error) {
     console.error('Dashboard GET error:', error)
