@@ -206,8 +206,27 @@ export async function GET(request: NextRequest) {
       expense: m.expense,
     }))
 
-    // Debug: Get ALL December transactions directly from DB to compare
-    const { data: allDecemberTx } = await supabase
+    // ===== DEBUG: Print to console =====
+    console.log('\n========== DASHBOARD DEBUG ==========')
+    console.log('Year:', year)
+    console.log('View:', view)
+    console.log('Accounts Param:', accountsParam)
+    console.log('Query Range:', startDate.toISOString(), 'to', endDate.toISOString())
+    console.log('Total Transactions Returned:', transactions.length)
+    console.log('Monthly Map Keys:', Array.from(monthlyMap.keys()))
+
+    // Check for December transactions in the query results
+    const decemberTx = transactions.filter(t => t.date.startsWith(`${year}-12`))
+    console.log('December transactions in query:', decemberTx.length)
+    if (decemberTx.length > 0) {
+      console.log('Sample December transactions:')
+      decemberTx.slice(0, 3).forEach(t => {
+        console.log(`  - Date: ${t.date}, Name: ${t.name}, Amount: ${t.amount}, Type: ${t.type}`)
+      })
+    }
+
+    // Direct query for December
+    const { data: directDecTx } = await supabase
       .from('ExpenseTransaction')
       .select('id, date, name, amount, type, account')
       .not('name', 'like', '[%')
@@ -215,21 +234,22 @@ export async function GET(request: NextRequest) {
       .lte('date', `${year}-12-31T23:59:59.999Z`)
       .limit(10)
 
-    // Debug: collect info about transactions that should be December
-    const decemberDebug = transactions
-      .filter(t => {
-        const rawDate = t.date
-        return rawDate.startsWith(`${year}-12`)
+    console.log('Direct December query results:', directDecTx?.length || 0)
+    if (directDecTx && directDecTx.length > 0) {
+      console.log('Direct December transactions:')
+      directDecTx.forEach(t => {
+        console.log(`  - Date: ${t.date}, Name: ${t.name}, Amount: ${t.amount}, Type: ${t.type}, Account: ${t.account}`)
       })
-      .slice(0, 5)
-      .map(t => ({
-        rawDate: t.date,
-        parsed: parseDbDate(t.date).toISOString(),
-        monthKey: getMonthKey(parseDbDate(t.date)),
-        type: t.type,
-        amount: t.amount,
-        name: t.name.substring(0, 20)
-      }))
+    }
+
+    // Show last 5 raw dates from main query
+    console.log('Last 5 raw dates from main query:', transactions.slice(-5).map(t => t.date))
+
+    // Show December in monthlyData
+    const decMonthData = monthlyData.find(m => m.month.startsWith('Dec'))
+    console.log('December in monthlyData:', decMonthData)
+    console.log('========== END DEBUG ==========\n')
+    // ===== END DEBUG =====
 
     return NextResponse.json({
       success: true,
@@ -237,20 +257,6 @@ export async function GET(request: NextRequest) {
       monthlyData,
       accountBreakdown,
       trendData,
-      _debug: {
-        year,
-        view,
-        accountsParam,
-        queryRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString(),
-        },
-        totalTransactionsReturned: transactions.length,
-        sampleRawDates: transactions.slice(-5).map(t => t.date),
-        decemberInQuery: decemberDebug,
-        directDecemberQuery: allDecemberTx,
-        monthlyMapKeys: Array.from(monthlyMap.keys()),
-      }
     })
   } catch (error) {
     console.error('Dashboard GET error:', error)
