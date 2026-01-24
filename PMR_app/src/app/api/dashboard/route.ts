@@ -97,6 +97,47 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error } = await query
     if (error) throw error
 
+    // ===== DEBUG: Account-specific investigation =====
+    console.log('\n========== DASHBOARD DEBUG ==========')
+    console.log('Year:', year, 'Accounts Param:', accountsParam)
+    console.log('Total transactions returned:', transactions.length)
+
+    // Check what accounts are in the returned data
+    const accountCounts: Record<string, number> = {}
+    transactions.forEach(t => {
+      accountCounts[t.account] = (accountCounts[t.account] || 0) + 1
+    })
+    console.log('Transactions by account:', accountCounts)
+
+    // Check December transactions by account
+    const decemberByAccount: Record<string, number> = {}
+    transactions.filter(t => t.date.includes('-12-')).forEach(t => {
+      decemberByAccount[t.account] = (decemberByAccount[t.account] || 0) + 1
+    })
+    console.log('December transactions by account:', decemberByAccount)
+
+    // Direct query for Cash December
+    const { data: cashDec } = await supabase
+      .from('ExpenseTransaction')
+      .select('date, name, amount, type')
+      .eq('account', 'CASH')
+      .gte('date', `${year}-12-01`)
+      .lte('date', `${year}-12-31T23:59:59Z`)
+      .limit(5)
+    console.log('Direct CASH December query:', cashDec?.length, cashDec)
+
+    // Direct query for Shivam December
+    const { data: shivamDec } = await supabase
+      .from('ExpenseTransaction')
+      .select('date, name, amount, type')
+      .eq('account', 'SHIVAM_TRIPATHI')
+      .gte('date', `${year}-12-01`)
+      .lte('date', `${year}-12-31T23:59:59Z`)
+      .limit(5)
+    console.log('Direct SHIVAM_TRIPATHI December query:', shivamDec?.length, shivamDec)
+    console.log('========== END DEBUG ==========\n')
+    // ===== END DEBUG =====
+
     // Calculate summary
     let totalIncome = 0
     let totalExpense = 0
