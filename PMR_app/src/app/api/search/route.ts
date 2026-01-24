@@ -31,12 +31,11 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build Supabase query with filters - EXCLUDE registry expenses
-    // NOTE: Must set high limit to override Supabase default of 1000 rows
+    // Build Supabase query with filters
+    // FIX: Removed .not('name', 'like', '[%') filter - filtering in JavaScript instead
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
-      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
       .limit(10000)  // Override default 1000 limit
@@ -64,8 +63,11 @@ export async function GET(request: NextRequest) {
       query = query.ilike('name', `%${name}%`)
     }
 
-    const { data: transactions, error } = await query
+    const { data: rawTransactions, error } = await query
     if (error) throw error
+
+    // FIX: Filter out registry expenses in JavaScript (names starting with '[')
+    const transactions = rawTransactions.filter(t => !t.name?.startsWith('['))
 
     // Calculate totals
     let totalIncome = 0
