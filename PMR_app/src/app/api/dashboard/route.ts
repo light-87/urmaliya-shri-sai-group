@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build Supabase query with filters - EXCLUDE registry expenses
+    // NOTE: Must set high limit to override Supabase default of 1000 rows
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest) {
       .gte('date', startDate.toISOString())
       .lte('date', endDate.toISOString())
       .order('date', { ascending: true })
+      .limit(10000)  // Override default 1000 limit to get all transactions
 
     // Add account filter if accounts are specified (not "ALL")
     if (accountsParam && accountsParam !== 'ALL') {
@@ -205,51 +207,6 @@ export async function GET(request: NextRequest) {
       income: m.income,
       expense: m.expense,
     }))
-
-    // ===== DEBUG: Print to console =====
-    console.log('\n========== DASHBOARD DEBUG ==========')
-    console.log('Year:', year)
-    console.log('View:', view)
-    console.log('Accounts Param:', accountsParam)
-    console.log('Query Range:', startDate.toISOString(), 'to', endDate.toISOString())
-    console.log('Total Transactions Returned:', transactions.length)
-    console.log('Monthly Map Keys:', Array.from(monthlyMap.keys()))
-
-    // Check for December transactions in the query results
-    const decemberTx = transactions.filter(t => t.date.startsWith(`${year}-12`))
-    console.log('December transactions in query:', decemberTx.length)
-    if (decemberTx.length > 0) {
-      console.log('Sample December transactions:')
-      decemberTx.slice(0, 3).forEach(t => {
-        console.log(`  - Date: ${t.date}, Name: ${t.name}, Amount: ${t.amount}, Type: ${t.type}`)
-      })
-    }
-
-    // Direct query for December
-    const { data: directDecTx } = await supabase
-      .from('ExpenseTransaction')
-      .select('id, date, name, amount, type, account')
-      .not('name', 'like', '[%')
-      .gte('date', `${year}-12-01`)
-      .lte('date', `${year}-12-31T23:59:59.999Z`)
-      .limit(10)
-
-    console.log('Direct December query results:', directDecTx?.length || 0)
-    if (directDecTx && directDecTx.length > 0) {
-      console.log('Direct December transactions:')
-      directDecTx.forEach(t => {
-        console.log(`  - Date: ${t.date}, Name: ${t.name}, Amount: ${t.amount}, Type: ${t.type}, Account: ${t.account}`)
-      })
-    }
-
-    // Show last 5 raw dates from main query
-    console.log('Last 5 raw dates from main query:', transactions.slice(-5).map(t => t.date))
-
-    // Show December in monthlyData
-    const decMonthData = monthlyData.find(m => m.month.startsWith('Dec'))
-    console.log('December in monthlyData:', decMonthData)
-    console.log('========== END DEBUG ==========\n')
-    // ===== END DEBUG =====
 
     return NextResponse.json({
       success: true,
