@@ -206,12 +206,51 @@ export async function GET(request: NextRequest) {
       expense: m.expense,
     }))
 
+    // Debug: Get ALL December transactions directly from DB to compare
+    const { data: allDecemberTx } = await supabase
+      .from('ExpenseTransaction')
+      .select('id, date, name, amount, type, account')
+      .not('name', 'like', '[%')
+      .gte('date', `${year}-12-01`)
+      .lte('date', `${year}-12-31T23:59:59.999Z`)
+      .limit(10)
+
+    // Debug: collect info about transactions that should be December
+    const decemberDebug = transactions
+      .filter(t => {
+        const rawDate = t.date
+        return rawDate.startsWith(`${year}-12`)
+      })
+      .slice(0, 5)
+      .map(t => ({
+        rawDate: t.date,
+        parsed: parseDbDate(t.date).toISOString(),
+        monthKey: getMonthKey(parseDbDate(t.date)),
+        type: t.type,
+        amount: t.amount,
+        name: t.name.substring(0, 20)
+      }))
+
     return NextResponse.json({
       success: true,
       summary,
       monthlyData,
       accountBreakdown,
       trendData,
+      _debug: {
+        year,
+        view,
+        accountsParam,
+        queryRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
+        totalTransactionsReturned: transactions.length,
+        sampleRawDates: transactions.slice(-5).map(t => t.date),
+        decemberInQuery: decemberDebug,
+        directDecemberQuery: allDecemberTx,
+        monthlyMapKeys: Array.from(monthlyMap.keys()),
+      }
     })
   } catch (error) {
     console.error('Dashboard GET error:', error)
