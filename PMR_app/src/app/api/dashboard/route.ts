@@ -42,12 +42,24 @@ export async function GET(request: NextRequest) {
       const [eYear, eMonth, eDay] = endDateParam.split('-').map(Number)
       endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999))
     } else if (view === 'last12months') {
+      // FIX: Use UTC-based date arithmetic to avoid timezone issues
       const now = new Date()
+      const nowYear = now.getUTCFullYear()
+      const nowMonth = now.getUTCMonth()
+      const nowDay = now.getUTCDate()
+
       // End date: today at end of day UTC
-      endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      endDate = new Date(Date.UTC(nowYear, nowMonth, nowDay, 23, 59, 59, 999))
+
       // Start date: 12 months ago at start of day UTC
-      const start = subMonths(now, 12)
-      startDate = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0, 0))
+      // Calculate 12 months ago using UTC arithmetic (not date-fns which uses local time)
+      let startYear = nowYear
+      let startMonth = nowMonth - 12
+      if (startMonth < 0) {
+        startYear -= 1
+        startMonth += 12
+      }
+      startDate = new Date(Date.UTC(startYear, startMonth, nowDay, 0, 0, 0, 0))
     } else if (view === 'alltime') {
       // Get earliest and latest dates from data
       // FIX: Removed .not() filter that was causing issues with Supabase queries
@@ -75,6 +87,13 @@ export async function GET(request: NextRequest) {
       startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0))  // Jan 1, year 00:00:00 UTC
       endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999))  // Dec 31, year 23:59:59 UTC
     }
+
+    // DEBUG: Log the date range being used
+    console.log('=== DASHBOARD DATE RANGE DEBUG ===')
+    console.log('View:', view, 'Year param:', year)
+    console.log('Start Date:', startDate.toISOString())
+    console.log('End Date:', endDate.toISOString())
+    console.log('================================')
 
     // Build Supabase query with filters
     // FIX: Removed .not('name', 'like', '[%') filter that was causing ALL accounts query to return 0 results
