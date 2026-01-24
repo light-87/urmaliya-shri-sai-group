@@ -97,10 +97,119 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error } = await query
     if (error) throw error
 
-    // ===== DEBUG: Account-specific investigation =====
-    console.log('\n========== DASHBOARD DEBUG ==========')
-    console.log('Year:', year, 'Accounts Param:', accountsParam)
+    // ===== DEBUG: Root cause investigation =====
+    console.log('\n========== DASHBOARD DEBUG (v2) ==========')
+    console.log('Query params - Year:', year, 'Accounts Param:', accountsParam)
+    console.log('Date range:', startDate.toISOString(), 'to', endDate.toISOString())
     console.log('Total transactions returned:', transactions.length)
+
+    // Test 1: Query WITHOUT the .not() filter to see if that's the issue
+    const { data: testWithoutNot, error: testError1 } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .order('date', { ascending: true })
+      .limit(10000)
+    console.log('TEST1 - Without .not() filter:', testWithoutNot?.length, 'transactions', testError1 ? `ERROR: ${testError1.message}` : '')
+
+    // Test 2: Count registry expenses (names starting with [)
+    const { data: registryExpenses, error: testError2 } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .like('name', '[%')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .limit(100)
+    console.log('TEST2 - Registry expenses (name LIKE "[%"):', registryExpenses?.length, testError2 ? `ERROR: ${testError2.message}` : '')
+
+    // Test 3: Check the difference
+    const withoutNotCount = testWithoutNot?.length || 0
+    const registryCount = registryExpenses?.length || 0
+    const mainQueryCount = transactions.length
+    console.log('TEST3 - Analysis:')
+    console.log('  - Without .not(): ', withoutNotCount)
+    console.log('  - Registry only:  ', registryCount)
+    console.log('  - Main query:     ', mainQueryCount)
+    console.log('  - Expected (without not - registry):', withoutNotCount - registryCount)
+    console.log('  - Difference:', (withoutNotCount - registryCount) - mainQueryCount)
+
+    // Test 4: CRITICAL - Compare with vs without account filter (using same .not() filter)
+    // This tests if the issue is specific to having no account filter
+    const { data: testWithCashFilter, error: testError4 } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .not('name', 'like', '[%')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .in('account', ['CASH'])
+      .limit(10000)
+    console.log('TEST4 - With CASH account filter + .not():', testWithCashFilter?.length, testError4 ? `ERROR: ${testError4.message}` : '')
+
+    // Test 5: Query with ALL accounts but WITHOUT .not() filter
+    const { data: testAllWithoutNot, error: testError5 } = await supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .limit(10000)
+    console.log('TEST5 - All accounts WITHOUT .not():', testAllWithoutNot?.length, testError5 ? `ERROR: ${testError5.message}` : '')
+
+    // Test 6: Check if any names literally contain [ character
+    const namesWithBracket = testWithoutNot?.filter(t => t.name && t.name.includes('['))
+    console.log('TEST6 - Transactions with [ in name:', namesWithBracket?.length, 'Examples:', namesWithBracket?.slice(0, 3).map(t => t.name))
+
+    // Test 7: ALTERNATIVE APPROACH - fetch without .not() filter, then filter in JavaScript
+    // This tests if the issue is with Supabase's .not() filter
+    let altQuery = supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .order('date', { ascending: true })
+      .limit(10000)
+    if (accountsParam && accountsParam !== 'ALL') {
+      const accounts = accountsParam.split(',')
+      altQuery = altQuery.in('account', accounts)
+    }
+    const { data: altTransactions, error: altError } = await altQuery
+    const filteredAltTransactions = altTransactions?.filter(t => !t.name?.startsWith('[')) || []
+
+    let altIncome = 0, altExpense = 0
+    filteredAltTransactions.forEach(t => {
+      const amt = Number(t.amount)
+      if (t.type === 'INCOME') altIncome += amt
+      else altExpense += amt
+    })
+    console.log('TEST7 - ALTERNATIVE (JS filter):')
+    console.log('  - Fetched without .not():', altTransactions?.length)
+    console.log('  - After JS filter (!startsWith("[")):', filteredAltTransactions.length)
+    console.log('  - Alt Income:', altIncome, 'Alt Expense:', altExpense)
+    console.log('  - MATCH?', altIncome === debugIncome && altExpense === debugExpense ? 'YES' : 'NO - BUG CONFIRMED!')
+
+    // If the alternative approach gives different results, the bug is in .not() filter
+    if (altIncome !== debugIncome || altExpense !== debugExpense) {
+      console.log('!!! BUG DETECTED: .not() filter gives different results than JS filter !!!')
+      console.log('!!! Main query income:', debugIncome, 'vs Alternative:', altIncome)
+      console.log('!!! Main query expense:', debugExpense, 'vs Alternative:', altExpense)
+    }
+
+    // Test 8: Try using .filter() syntax instead of .not()
+    // This uses a different Supabase method that might work differently
+    let filterQuery = supabase
+      .from('ExpenseTransaction')
+      .select('*')
+      .filter('name', 'not.like', '[%')  // Alternative syntax
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+      .order('date', { ascending: true })
+      .limit(10000)
+    if (accountsParam && accountsParam !== 'ALL') {
+      const accounts = accountsParam.split(',')
+      filterQuery = filterQuery.in('account', accounts)
+    }
+    const { data: filterTransactions, error: filterError } = await filterQuery
+    console.log('TEST8 - Using .filter() syntax:', filterTransactions?.length, filterError ? `ERROR: ${filterError.message}` : '')
 
     // Check what accounts are in the returned data
     const accountCounts: Record<string, number> = {}
@@ -109,32 +218,24 @@ export async function GET(request: NextRequest) {
     })
     console.log('Transactions by account:', accountCounts)
 
-    // Check December transactions by account
-    const decemberByAccount: Record<string, number> = {}
-    transactions.filter(t => t.date.includes('-12-')).forEach(t => {
-      decemberByAccount[t.account] = (decemberByAccount[t.account] || 0) + 1
+    // Check amounts and types
+    let debugIncome = 0, debugExpense = 0
+    transactions.forEach(t => {
+      const amt = Number(t.amount)
+      if (t.type === 'INCOME') debugIncome += amt
+      else debugExpense += amt
     })
-    console.log('December transactions by account:', decemberByAccount)
+    console.log('Calculated totals - Income:', debugIncome, 'Expense:', debugExpense)
 
-    // Direct query for Cash December
-    const { data: cashDec } = await supabase
-      .from('ExpenseTransaction')
-      .select('date, name, amount, type')
-      .eq('account', 'CASH')
-      .gte('date', `${year}-12-01`)
-      .lte('date', `${year}-12-31T23:59:59Z`)
-      .limit(5)
-    console.log('Direct CASH December query:', cashDec?.length, cashDec)
+    // Sample of first 5 transactions
+    console.log('First 5 transactions sample:', transactions.slice(0, 5).map(t => ({
+      date: t.date,
+      account: t.account,
+      type: t.type,
+      amount: t.amount,
+      name: t.name?.substring(0, 30)
+    })))
 
-    // Direct query for Shivam December
-    const { data: shivamDec } = await supabase
-      .from('ExpenseTransaction')
-      .select('date, name, amount, type')
-      .eq('account', 'SHIVAM_TRIPATHI')
-      .gte('date', `${year}-12-01`)
-      .lte('date', `${year}-12-31T23:59:59Z`)
-      .limit(5)
-    console.log('Direct SHIVAM_TRIPATHI December query:', shivamDec?.length, shivamDec)
     console.log('========== END DEBUG ==========\n')
     // ===== END DEBUG =====
 
