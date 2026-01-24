@@ -32,12 +32,14 @@ export async function GET(request: NextRequest) {
     const name = searchParams.get('name')
 
     // Build Supabase query with filters - EXCLUDE registry expenses
+    // NOTE: Must set high limit to override Supabase default of 1000 rows
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
       .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
+      .limit(10000)  // Override default 1000 limit
 
     if (startDate) {
       // Parse date explicitly to avoid timezone ambiguity

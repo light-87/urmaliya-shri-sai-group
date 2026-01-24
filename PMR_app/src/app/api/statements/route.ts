@@ -36,12 +36,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Build Supabase query - EXCLUDE registry expenses
+    // NOTE: Must set high limit to override Supabase default of 1000 rows
     let query = supabase
       .from('ExpenseTransaction')
       .select('*')
       .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .ilike('name', name)  // Case insensitive match
       .order('date', { ascending: true })
+      .limit(10000)  // Override default 1000 limit
 
     // Apply date filters - parse explicitly to avoid timezone ambiguity
     if (startDate) {
