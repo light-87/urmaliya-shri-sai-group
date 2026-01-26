@@ -89,11 +89,10 @@ export async function GET(request: NextRequest) {
     }
 
     // DEBUG: Log the date range being used
-    console.log('=== DASHBOARD DATE RANGE DEBUG ===')
-    console.log('View:', view, 'Year param:', year)
+    console.log('=== DASHBOARD DEBUG ===')
+    console.log('View:', view, 'Year param:', year, 'Accounts:', accountsParam)
     console.log('Start Date:', startDate.toISOString())
     console.log('End Date:', endDate.toISOString())
-    console.log('================================')
 
     // Build Supabase query with filters
     // FIX: Removed .not('name', 'like', '[%') filter that was causing ALL accounts query to return 0 results
@@ -115,9 +114,16 @@ export async function GET(request: NextRequest) {
     const { data: rawTransactions, error } = await query
     if (error) throw error
 
+    console.log('Raw transactions from DB:', rawTransactions.length)
+
     // FIX: Filter out registry expenses in JavaScript (names starting with '[')
     // This is more reliable than the Supabase .not() filter which was causing issues
     const transactions = rawTransactions.filter(t => !t.name?.startsWith('['))
+
+    console.log('After filtering registry:', transactions.length)
+
+    // DEBUG: Show sample of raw date values from first 5 transactions
+    console.log('Sample raw dates:', transactions.slice(0, 5).map(t => ({ date: t.date, account: t.account })))
 
     // Calculate summary
     let totalIncome = 0
@@ -190,12 +196,27 @@ export async function GET(request: NextRequest) {
       return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
     }
 
+    // DEBUG: Show initialized month keys
+    console.log('Initialized month keys:', Array.from(monthlyMap.keys()))
+
+    // DEBUG: Track parsing issues
+    const parseErrors: { date: string; parsed: string; monthKey: string }[] = []
+    const monthCounts: Record<string, number> = {}
+
     // Populate with actual transaction data using explicit UTC date parsing
     transactions.forEach(t => {
       const txDate = parseDbDate(t.date)
       const monthKey = getMonthKey(txDate)
       const existing = monthlyMap.get(monthKey) || { income: 0, expense: 0 }
       const amount = Number(t.amount)
+
+      // DEBUG: Count transactions per month key
+      monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1
+
+      // DEBUG: Track if month key doesn't exist in pre-initialized map
+      if (!monthlyMap.has(monthKey)) {
+        parseErrors.push({ date: t.date, parsed: txDate.toISOString(), monthKey })
+      }
 
       if (t.type === 'INCOME') {
         existing.income += amount
@@ -205,6 +226,18 @@ export async function GET(request: NextRequest) {
 
       monthlyMap.set(monthKey, existing)
     })
+
+    // DEBUG: Show transaction counts per month
+    console.log('Transactions per month key:', monthCounts)
+
+    // DEBUG: Show any parsing errors (transactions that didn't match initialized months)
+    if (parseErrors.length > 0) {
+      console.log('PARSE ERRORS (month keys not in initialized map):', parseErrors.slice(0, 10))
+    }
+
+    // DEBUG: Show final monthly data
+    console.log('Final monthly map:', Object.fromEntries(monthlyMap))
+    console.log('=== END DEBUG ===')
 
     // Convert to array while preserving chronological order
     const monthlyData = Array.from(monthlyMap.entries()).map(([month, data]) => ({
