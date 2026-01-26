@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const prevDayEnd = endOfDay(subDays(targetDate, 1))
 
     // Fetch all data in parallel
+    // FIX: Removed .not('name', 'like', '[%') filter - filtering in JavaScript instead
     const [
       expenseResult,
       prevExpenseResult,
@@ -47,19 +48,17 @@ export async function GET(request: NextRequest) {
       stockResult,
       stockSummaryResult,
     ] = await Promise.all([
-      // Current day expenses - EXCLUDE registry expenses
+      // Current day expenses
       supabase
         .from('ExpenseTransaction')
         .select('*')
-        .not('name', 'like', '[%')  // Exclude registry expenses with category tags
         .gte('date', dayStart.toISOString())
         .lte('date', dayEnd.toISOString())
         .order('date', { ascending: false }),
-      // Previous day expenses for comparison - EXCLUDE registry expenses
+      // Previous day expenses for comparison
       supabase
         .from('ExpenseTransaction')
         .select('*')
-        .not('name', 'like', '[%')  // Exclude registry expenses with category tags
         .gte('date', prevDayStart.toISOString())
         .lte('date', prevDayEnd.toISOString()),
       // Current day inventory
@@ -96,8 +95,9 @@ export async function GET(request: NextRequest) {
     if (stockResult.error) throw stockResult.error
     if (stockSummaryResult.error) throw stockSummaryResult.error
 
-    const expenseTransactions = expenseResult.data || []
-    const prevExpenseTransactions = prevExpenseResult.data || []
+    // FIX: Filter out registry expenses in JavaScript (names starting with '[')
+    const expenseTransactions = (expenseResult.data || []).filter(t => !t.name?.startsWith('['))
+    const prevExpenseTransactions = (prevExpenseResult.data || []).filter(t => !t.name?.startsWith('['))
     const inventoryTransactions = inventoryResult.data || []
     const inventorySummary = inventorySummaryResult.data || []
     const stockTransactions = stockResult.data || []

@@ -42,18 +42,30 @@ export async function GET(request: NextRequest) {
       const [eYear, eMonth, eDay] = endDateParam.split('-').map(Number)
       endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999))
     } else if (view === 'last12months') {
+      // FIX: Use UTC-based date arithmetic to avoid timezone issues
       const now = new Date()
+      const nowYear = now.getUTCFullYear()
+      const nowMonth = now.getUTCMonth()
+      const nowDay = now.getUTCDate()
+
       // End date: today at end of day UTC
-      endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      endDate = new Date(Date.UTC(nowYear, nowMonth, nowDay, 23, 59, 59, 999))
+
       // Start date: 12 months ago at start of day UTC
-      const start = subMonths(now, 12)
-      startDate = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0, 0))
+      // Calculate 12 months ago using UTC arithmetic (not date-fns which uses local time)
+      let startYear = nowYear
+      let startMonth = nowMonth - 12
+      if (startMonth < 0) {
+        startYear -= 1
+        startMonth += 12
+      }
+      startDate = new Date(Date.UTC(startYear, startMonth, nowDay, 0, 0, 0, 0))
     } else if (view === 'alltime') {
-      // Get earliest and latest dates from data - EXCLUDE registry expenses
+      // Get earliest and latest dates from data
+      // FIX: Removed .not() filter that was causing issues with Supabase queries
       const { data: earliest, error: earliestError } = await supabase
         .from('ExpenseTransaction')
         .select('date')
-        .not('name', 'like', '[%')  // Exclude registry expenses
         .order('date', { ascending: true })
         .limit(1)
         .single()
@@ -62,7 +74,6 @@ export async function GET(request: NextRequest) {
       const { data: latest, error: latestError } = await supabase
         .from('ExpenseTransaction')
         .select('date')
-        .not('name', 'like', '[%')  // Exclude registry expenses
         .order('date', { ascending: false })
         .limit(1)
         .single()
@@ -77,66 +88,63 @@ export async function GET(request: NextRequest) {
       endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999))  // Dec 31, year 23:59:59 UTC
     }
 
-    // Build Supabase query with filters - EXCLUDE registry expenses
-    // NOTE: Must set high limit to override Supabase default of 1000 rows
-    let query = supabase
-      .from('ExpenseTransaction')
-      .select('*')
-      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
-      .gte('date', startDate.toISOString())
-      .lte('date', endDate.toISOString())
-      .order('date', { ascending: true })
-      .limit(10000)  // Override default 1000 limit to get all transactions
+    // DEBUG: Log the date range being used
+    console.log('=== DASHBOARD DEBUG ===')
+    console.log('View:', view, 'Year param:', year, 'Accounts:', accountsParam)
+    console.log('Start Date:', startDate.toISOString())
+    console.log('End Date:', endDate.toISOString())
 
-    // Add account filter if accounts are specified (not "ALL")
-    if (accountsParam && accountsParam !== 'ALL') {
-      const accounts = accountsParam.split(',')
-      query = query.in('account', accounts)
+    // Build Supabase query with filters
+    // FIX: Use pagination to fetch ALL records - Supabase has a max rows limit (usually 1000)
+    // that can't be overridden with .limit() alone
+    const fetchAllTransactions = async () => {
+      const allTransactions: any[] = []
+      const pageSize = 1000
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        let query = supabase
+          .from('ExpenseTransaction')
+          .select('*')
+          .gte('date', startDate.toISOString())
+          .lte('date', endDate.toISOString())
+          .order('date', { ascending: true })
+          .range(offset, offset + pageSize - 1)
+
+        // Add account filter if accounts are specified (not "ALL")
+        if (accountsParam && accountsParam !== 'ALL') {
+          const accounts = accountsParam.split(',')
+          query = query.in('account', accounts)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          allTransactions.push(...data)
+          offset += pageSize
+          hasMore = data.length === pageSize // If we got a full page, there might be more
+        } else {
+          hasMore = false
+        }
+      }
+
+      return allTransactions
     }
 
-    const { data: transactions, error } = await query
-    if (error) throw error
+    const rawTransactions = await fetchAllTransactions()
 
-    // ===== DEBUG: Account-specific investigation =====
-    console.log('\n========== DASHBOARD DEBUG ==========')
-    console.log('Year:', year, 'Accounts Param:', accountsParam)
-    console.log('Total transactions returned:', transactions.length)
+    console.log('Raw transactions from DB (paginated):', rawTransactions.length)
 
-    // Check what accounts are in the returned data
-    const accountCounts: Record<string, number> = {}
-    transactions.forEach(t => {
-      accountCounts[t.account] = (accountCounts[t.account] || 0) + 1
-    })
-    console.log('Transactions by account:', accountCounts)
+    // FIX: Filter out registry expenses in JavaScript (names starting with '[')
+    // This is more reliable than the Supabase .not() filter which was causing issues
+    const transactions = rawTransactions.filter(t => !t.name?.startsWith('['))
 
-    // Check December transactions by account
-    const decemberByAccount: Record<string, number> = {}
-    transactions.filter(t => t.date.includes('-12-')).forEach(t => {
-      decemberByAccount[t.account] = (decemberByAccount[t.account] || 0) + 1
-    })
-    console.log('December transactions by account:', decemberByAccount)
+    console.log('After filtering registry:', transactions.length)
 
-    // Direct query for Cash December
-    const { data: cashDec } = await supabase
-      .from('ExpenseTransaction')
-      .select('date, name, amount, type')
-      .eq('account', 'CASH')
-      .gte('date', `${year}-12-01`)
-      .lte('date', `${year}-12-31T23:59:59Z`)
-      .limit(5)
-    console.log('Direct CASH December query:', cashDec?.length, cashDec)
-
-    // Direct query for Shivam December
-    const { data: shivamDec } = await supabase
-      .from('ExpenseTransaction')
-      .select('date, name, amount, type')
-      .eq('account', 'SHIVAM_TRIPATHI')
-      .gte('date', `${year}-12-01`)
-      .lte('date', `${year}-12-31T23:59:59Z`)
-      .limit(5)
-    console.log('Direct SHIVAM_TRIPATHI December query:', shivamDec?.length, shivamDec)
-    console.log('========== END DEBUG ==========\n')
-    // ===== END DEBUG =====
+    // DEBUG: Show sample of raw date values from first 5 transactions
+    console.log('Sample raw dates:', transactions.slice(0, 5).map(t => ({ date: t.date, account: t.account })))
 
     // Calculate summary
     let totalIncome = 0
@@ -184,15 +192,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Helper to parse date from database - handles both ISO and simple date formats
+    // Helper to parse date from database - handles multiple date formats
+    // PostgreSQL returns: "2026-01-01 00:00:00+00" (space, not T)
+    // ISO format: "2026-01-01T00:00:00.000Z" (has T)
+    // Simple format: "2026-01-01"
     const parseDbDate = (dateStr: string): Date => {
-      if (dateStr.includes('T')) {
-        return new Date(dateStr)
+      // Handle PostgreSQL timestamp format: "2026-01-01 00:00:00+00"
+      // Convert space to 'T' to make it ISO-compatible
+      const normalized = dateStr.replace(' ', 'T')
+
+      // Now parse as ISO format - this handles both:
+      // - Original ISO: "2026-01-01T00:00:00.000Z"
+      // - Converted PostgreSQL: "2026-01-01T00:00:00+00"
+      // - Simple format: "2026-01-01" (will be parsed as local, but we extract UTC parts)
+      const date = new Date(normalized)
+
+      // If it's a valid date, return it
+      if (!isNaN(date.getTime())) {
+        return date
       }
-      // Simple date format "YYYY-MM-DD" - parse explicitly as UTC
+
+      // Fallback: try parsing as simple YYYY-MM-DD
       const [year, month, day] = dateStr.split('-').map(Number)
       return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
     }
+
+    // DEBUG: Show initialized month keys
+    console.log('Initialized month keys:', Array.from(monthlyMap.keys()))
+
+    // DEBUG: Track parsing issues
+    const parseErrors: { date: string; parsed: string; monthKey: string }[] = []
+    const monthCounts: Record<string, number> = {}
 
     // Populate with actual transaction data using explicit UTC date parsing
     transactions.forEach(t => {
@@ -200,6 +230,14 @@ export async function GET(request: NextRequest) {
       const monthKey = getMonthKey(txDate)
       const existing = monthlyMap.get(monthKey) || { income: 0, expense: 0 }
       const amount = Number(t.amount)
+
+      // DEBUG: Count transactions per month key
+      monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1
+
+      // DEBUG: Track if month key doesn't exist in pre-initialized map
+      if (!monthlyMap.has(monthKey)) {
+        parseErrors.push({ date: t.date, parsed: txDate.toISOString(), monthKey })
+      }
 
       if (t.type === 'INCOME') {
         existing.income += amount
@@ -209,6 +247,18 @@ export async function GET(request: NextRequest) {
 
       monthlyMap.set(monthKey, existing)
     })
+
+    // DEBUG: Show transaction counts per month
+    console.log('Transactions per month key:', monthCounts)
+
+    // DEBUG: Show any parsing errors (transactions that didn't match initialized months)
+    if (parseErrors.length > 0) {
+      console.log('PARSE ERRORS (month keys not in initialized map):', parseErrors.slice(0, 10))
+    }
+
+    // DEBUG: Show final monthly data
+    console.log('Final monthly map:', Object.fromEntries(monthlyMap))
+    console.log('=== END DEBUG ===')
 
     // Convert to array while preserving chronological order
     const monthlyData = Array.from(monthlyMap.entries()).map(([month, data]) => ({

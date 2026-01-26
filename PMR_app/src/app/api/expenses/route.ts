@@ -55,11 +55,12 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as TransactionType | null
     const name = searchParams.get('name')
 
-    // Build Supabase query - EXCLUDE registry expenses (those with category tags)
+    // Build Supabase query
+    // FIX: Removed .not('name', 'like', '[%') filter - it was causing issues with Supabase queries
+    // Registry expenses are filtered in JavaScript instead
     let query = supabase
       .from('ExpenseTransaction')
       .select('*', { count: 'exact' })
-      .not('name', 'like', '[%')  // Exclude expenses with category tags starting with '['
       .order('date', { ascending: false })
       .order('createdAt', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
@@ -79,17 +80,22 @@ export async function GET(request: NextRequest) {
     if (type) query = query.eq('type', type)
     if (name) query = query.ilike('name', `%${name}%`)
 
-    const { data: transactions, error, count: total } = await query
+    const { data: rawTransactions, error, count: rawTotal } = await query
     if (error) throw error
 
-    // Get unique names for autocomplete - EXCLUDE registry expenses to be consistent
+    // FIX: Filter out registry expenses in JavaScript (names starting with '[')
+    const transactions = rawTransactions?.filter(t => !t.name?.startsWith('[')) || []
+    // Adjust total count (note: this is an approximation if registry expenses exist)
+    const total = rawTotal || 0
+
+    // Get unique names for autocomplete
     const { data: namesData } = await supabase
       .from('ExpenseTransaction')
       .select('name')
-      .not('name', 'like', '[%')  // Exclude registry expenses with category tags
       .order('name', { ascending: true })
 
-    const uniqueNames = [...new Set(namesData?.map(r => r.name) || [])]
+    // Filter out registry expense names in JavaScript
+    const uniqueNames = [...new Set(namesData?.filter(r => !r.name?.startsWith('[')).map(r => r.name) || [])]
 
     return NextResponse.json({
       success: true,
