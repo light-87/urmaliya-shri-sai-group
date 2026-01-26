@@ -95,26 +95,47 @@ export async function GET(request: NextRequest) {
     console.log('End Date:', endDate.toISOString())
 
     // Build Supabase query with filters
-    // FIX: Removed .not('name', 'like', '[%') filter that was causing ALL accounts query to return 0 results
-    // Registry expenses will be filtered in JavaScript instead (more reliable)
-    let query = supabase
-      .from('ExpenseTransaction')
-      .select('*')
-      .gte('date', startDate.toISOString())
-      .lte('date', endDate.toISOString())
-      .order('date', { ascending: true })
-      .limit(10000)  // Override default 1000 limit to get all transactions
+    // FIX: Use pagination to fetch ALL records - Supabase has a max rows limit (usually 1000)
+    // that can't be overridden with .limit() alone
+    const fetchAllTransactions = async () => {
+      const allTransactions: any[] = []
+      const pageSize = 1000
+      let offset = 0
+      let hasMore = true
 
-    // Add account filter if accounts are specified (not "ALL")
-    if (accountsParam && accountsParam !== 'ALL') {
-      const accounts = accountsParam.split(',')
-      query = query.in('account', accounts)
+      while (hasMore) {
+        let query = supabase
+          .from('ExpenseTransaction')
+          .select('*')
+          .gte('date', startDate.toISOString())
+          .lte('date', endDate.toISOString())
+          .order('date', { ascending: true })
+          .range(offset, offset + pageSize - 1)
+
+        // Add account filter if accounts are specified (not "ALL")
+        if (accountsParam && accountsParam !== 'ALL') {
+          const accounts = accountsParam.split(',')
+          query = query.in('account', accounts)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          allTransactions.push(...data)
+          offset += pageSize
+          hasMore = data.length === pageSize // If we got a full page, there might be more
+        } else {
+          hasMore = false
+        }
+      }
+
+      return allTransactions
     }
 
-    const { data: rawTransactions, error } = await query
-    if (error) throw error
+    const rawTransactions = await fetchAllTransactions()
 
-    console.log('Raw transactions from DB:', rawTransactions.length)
+    console.log('Raw transactions from DB (paginated):', rawTransactions.length)
 
     // FIX: Filter out registry expenses in JavaScript (names starting with '[')
     // This is more reliable than the Supabase .not() filter which was causing issues
