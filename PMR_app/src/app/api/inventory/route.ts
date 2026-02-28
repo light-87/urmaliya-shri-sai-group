@@ -175,29 +175,27 @@ export async function POST(request: NextRequest) {
 
     // Auto-update stock tracking (only if StockTransaction table exists)
     const bucketSize = BUCKET_SIZES[validatedData.bucketType]
-    if (bucketSize > 0) {
-      try {
-        // Check if StockTransaction table exists
-        const { data: testData } = await supabase
-          .from('StockTransaction')
-          .select('id')
-          .limit(1)
+    if (bucketSize > 0 && validatedData.action === 'SELL') {
+      // Check if StockTransaction table exists
+      const { error: tableError } = await supabase
+        .from('StockTransaction')
+        .select('id')
+        .limit(1)
 
-        if (validatedData.action === 'SELL') {
-          // Selling buckets: fill them first (subtract from Free DEF), then sell
-          await createStockTransaction({
-            date: validatedData.date,
-            type: 'SELL_BUCKETS',
-            category: 'FREE_DEF',
-            quantity: -(validatedData.quantity * bucketSize),
-            unit: 'LITERS',
-            description: `Sold ${validatedData.quantity}x ${validatedData.bucketType} (${validatedData.quantity * bucketSize}L) to ${validatedData.buyerSeller}`,
-          })
-        }
-        // Note: STOCK action does nothing to Free DEF - buckets are empty containers
-      } catch (stockError) {
-        // Table doesn't exist yet or other error - silently skip stock tracking
+      if (tableError && tableError.code === '42P01') {
+        // Table doesn't exist yet — silently skip (migration pending)
         console.log('Stock tracking not available yet (migration pending)')
+      } else {
+        // Table exists — create the FREE DEF deduction (errors will propagate)
+        // Note: STOCK action does nothing to Free DEF - buckets are empty containers
+        await createStockTransaction({
+          date: validatedData.date,
+          type: 'SELL_BUCKETS',
+          category: 'FREE_DEF',
+          quantity: -(validatedData.quantity * bucketSize),
+          unit: 'LITERS',
+          description: `Sold ${validatedData.quantity}x ${validatedData.bucketType} (${validatedData.quantity * bucketSize}L) to ${validatedData.buyerSeller}`,
+        })
       }
     }
 
@@ -377,21 +375,47 @@ async function createStockTransaction(data: {
   unit: 'LITERS'
   description: string
 }) {
-  // Get current stock for this category
-  const { data: lastTransaction } = await supabase
+  // Check if this is a backdated transaction
+  const { data: latestTx } = await supabase
     .from('StockTransaction')
-    .select('runningTotal')
+    .select('date')
     .eq('category', data.category)
     .order('date', { ascending: false })
     .order('createdAt', { ascending: false })
     .limit(1)
     .single()
 
-  const currentStock = lastTransaction?.runningTotal || 0
+  const isBackdated = latestTx && new Date(data.date) < new Date(latestTx.date)
+
+  // Get correct stock balance at the transaction date
+  let currentStock: number
+  if (isBackdated) {
+    const { data: txAtDate } = await supabase
+      .from('StockTransaction')
+      .select('runningTotal')
+      .eq('category', data.category)
+      .lt('date', data.date.toISOString())
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single()
+    currentStock = txAtDate?.runningTotal || 0
+  } else {
+    const { data: lastTx } = await supabase
+      .from('StockTransaction')
+      .select('runningTotal')
+      .eq('category', data.category)
+      .order('date', { ascending: false })
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single()
+    currentStock = lastTx?.runningTotal || 0
+  }
+
   const newRunningTotal = currentStock + data.quantity
 
-  // Create stock transaction
-  await supabase
+  // Create stock transaction and check for errors
+  const { error } = await supabase
     .from('StockTransaction')
     .insert({
       id: randomUUID(),
@@ -403,4 +427,28 @@ async function createStockTransaction(data: {
       description: data.description,
       runningTotal: newRunningTotal,
     })
+  if (error) throw error
+
+  // If backdated, recalculate running totals for all subsequent FREE_DEF transactions
+  if (isBackdated) {
+    const { data: subsequentTxs, error: fetchError } = await supabase
+      .from('StockTransaction')
+      .select('*')
+      .eq('category', data.category)
+      .gte('date', data.date.toISOString())
+      .order('date', { ascending: true })
+      .order('createdAt', { ascending: true })
+    if (fetchError) throw fetchError
+    if (subsequentTxs && subsequentTxs.length > 0) {
+      let runningTotal = currentStock
+      for (const tx of subsequentTxs) {
+        runningTotal += tx.quantity
+        const { error: updateError } = await supabase
+          .from('StockTransaction')
+          .update({ runningTotal })
+          .eq('id', tx.id)
+        if (updateError) throw updateError
+      }
+    }
+  }
 }
