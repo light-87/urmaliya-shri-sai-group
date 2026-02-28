@@ -204,23 +204,19 @@ export async function DELETE(
       }
     }
 
-    // If this is a regular bucket transaction, delete corresponding StockTransactions
+    // If this is a SELL of a DEF bucket, delete the corresponding SELL_BUCKETS StockTransaction
+    // STOCK action (adding empty buckets) never creates a StockTransaction, so skip it
     const bucketSize = await getBucketSize(transaction.bucketType)
-    if (bucketSize > 0) {
+    if (bucketSize > 0 && transaction.action === ActionType.SELL) {
       try {
-        // Find StockTransactions created when this inventory transaction was made
-        const stockType = transaction.action === ActionType.STOCK ? StockTransactionType.FILL_BUCKETS : StockTransactionType.SELL_BUCKETS
-        const stockCategory = transaction.action === ActionType.STOCK ? StockCategory.FREE_DEF : StockCategory.FINISHED_GOODS
-        const expectedQuantity = transaction.action === ActionType.STOCK
-          ? -(Math.abs(transaction.quantity) * bucketSize)
-          : -(Math.abs(transaction.quantity) * bucketSize)
+        const expectedQuantity = -(Math.abs(transaction.quantity) * bucketSize)
 
         const { data: stockTransactionsToDelete, error: stockFetchError } = await supabase
           .from('StockTransaction')
           .select('*')
           .eq('date', transaction.date)
-          .eq('type', stockType)
-          .eq('category', stockCategory)
+          .eq('type', StockTransactionType.SELL_BUCKETS)
+          .eq('category', StockCategory.FREE_DEF)
           .eq('quantity', expectedQuantity)
 
         if (!stockFetchError && stockTransactionsToDelete) {
@@ -232,8 +228,8 @@ export async function DELETE(
               .eq('id', st.id)
           }
 
-          // Recalculate StockTransaction running totals for affected category
-          await recalculateStockRunningTotals(stockCategory)
+          // Recalculate FREE_DEF running totals to restore the balance
+          await recalculateStockRunningTotals(StockCategory.FREE_DEF)
         }
       } catch (stockError) {
         console.error('Failed to delete/recalculate stock transactions:', stockError)
