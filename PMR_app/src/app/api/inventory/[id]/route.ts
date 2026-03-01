@@ -174,29 +174,24 @@ export async function DELETE(
     // we need to also delete the corresponding StockTransactions
     if (transaction.warehouse === Warehouse.FACTORY && transaction.bucketType === BucketType.FREE_DEF && transaction.action === ActionType.SELL) {
       try {
-        // Find and delete corresponding StockTransactions by matching date and quantity
-        // When selling Free DEF, we created 2 StockTransactions:
-        // 1. SELL_FREE_DEF for FREE_DEF category (negative quantity)
-        // 2. SELL_FREE_DEF for FINISHED_GOODS category (negative quantity)
+        const restoreAmount = Math.abs(transaction.quantity)
         const { data: stockTransactionsToDelete, error: stockFetchError } = await supabase
           .from('StockTransaction')
           .select('*')
           .eq('date', transaction.date)
           .eq('type', StockTransactionType.SELL_FREE_DEF)
-          .eq('quantity', -Math.abs(transaction.quantity))
+          .eq('quantity', -restoreAmount)
 
-        if (!stockFetchError && stockTransactionsToDelete) {
-          // Delete the StockTransactions
+        if (!stockFetchError && stockTransactionsToDelete && stockTransactionsToDelete.length > 0) {
           for (const st of stockTransactionsToDelete) {
             await supabase
               .from('StockTransaction')
               .delete()
               .eq('id', st.id)
           }
-
-          // Recalculate StockTransaction running totals for affected categories
-          await recalculateStockRunningTotals(StockCategory.FREE_DEF)
-          await recalculateStockRunningTotals(StockCategory.FINISHED_GOODS)
+          // Shift running totals forward from this date — do NOT recalculate from 0
+          await shiftStockRunningTotals(StockCategory.FREE_DEF, transaction.date, restoreAmount)
+          await shiftStockRunningTotals(StockCategory.FINISHED_GOODS, transaction.date, restoreAmount)
         }
       } catch (stockError) {
         console.error('Failed to delete/recalculate stock transactions:', stockError)
@@ -210,6 +205,7 @@ export async function DELETE(
     if (bucketSize > 0 && transaction.action === ActionType.SELL) {
       try {
         const expectedQuantity = -(Math.abs(transaction.quantity) * bucketSize)
+        const restoreAmount = Math.abs(expectedQuantity)
 
         const { data: stockTransactionsToDelete, error: stockFetchError } = await supabase
           .from('StockTransaction')
@@ -219,17 +215,15 @@ export async function DELETE(
           .eq('category', StockCategory.FREE_DEF)
           .eq('quantity', expectedQuantity)
 
-        if (!stockFetchError && stockTransactionsToDelete) {
-          // Delete the StockTransactions
+        if (!stockFetchError && stockTransactionsToDelete && stockTransactionsToDelete.length > 0) {
           for (const st of stockTransactionsToDelete) {
             await supabase
               .from('StockTransaction')
               .delete()
               .eq('id', st.id)
           }
-
-          // Recalculate FREE_DEF running totals to restore the balance
-          await recalculateStockRunningTotals(StockCategory.FREE_DEF)
+          // Shift running totals forward from this date — do NOT recalculate from 0
+          await shiftStockRunningTotals(StockCategory.FREE_DEF, transaction.date, restoreAmount)
         }
       } catch (stockError) {
         console.error('Failed to delete/recalculate stock transactions:', stockError)
@@ -291,35 +285,31 @@ async function recalculateRunningTotals(
   }
 }
 
-// Helper function to recalculate StockTransaction running totals for a category
-async function recalculateStockRunningTotals(
-  category: StockCategory
+// Helper function to restore StockTransaction running totals after a deletion.
+// Instead of recalculating from 0 (which would corrupt historical data), we
+// shift all entries from `fromDate` onwards by +amount, reversing the deleted entry.
+async function shiftStockRunningTotals(
+  category: StockCategory,
+  fromDate: string,
+  amount: number  // positive number — the liters to add back
 ) {
   try {
-    // Get all transactions for this category, ordered by date
-    const { data: transactions, error } = await supabase
+    const { data: txsToUpdate } = await supabase
       .from('StockTransaction')
-      .select('*')
+      .select('id, runningTotal')
       .eq('category', category)
-      .order('date', { ascending: true })
-      .order('createdAt', { ascending: true })
+      .gte('date', fromDate)
 
-    if (error || !transactions) {
-      console.error(`Failed to fetch stock transactions for ${category}:`, error)
-      return
-    }
-
-    // Recalculate running totals
-    let runningTotal = 0
-    for (const transaction of transactions) {
-      runningTotal += transaction.quantity
-      await supabase
-        .from('StockTransaction')
-        .update({ runningTotal })
-        .eq('id', transaction.id)
+    if (txsToUpdate) {
+      for (const tx of txsToUpdate) {
+        await supabase
+          .from('StockTransaction')
+          .update({ runningTotal: tx.runningTotal + amount })
+          .eq('id', tx.id)
+      }
     }
   } catch (error) {
-    console.error(`Failed to recalculate stock running totals for ${category}:`, error)
+    console.error(`Failed to shift stock running totals for ${category}:`, error)
   }
 }
 
