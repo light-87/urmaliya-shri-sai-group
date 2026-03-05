@@ -305,6 +305,7 @@ export enum StockTransactionType {
   SELL_FREE_DEF = 'SELL_FREE_DEF',
   FILL_BUCKETS = 'FILL_BUCKETS',
   SELL_BUCKETS = 'SELL_BUCKETS',
+  RETURN_BUCKETS = 'RETURN_BUCKETS',
 }
 
 export enum StockCategory {
@@ -367,6 +368,7 @@ export const STOCK_TYPE_LABELS: Record<StockTransactionType, string> = {
   SELL_FREE_DEF: 'Sell Free DEF',
   FILL_BUCKETS: 'Fill Buckets',
   SELL_BUCKETS: 'Sell Buckets',
+  RETURN_BUCKETS: 'Return Buckets',
 }
 
 export const STOCK_CATEGORY_LABELS: Record<StockCategory, string> = {

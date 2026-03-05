@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { InventoryDashboard } from './components/InventoryDashboard'
 import { AddEntryForm } from './components/AddEntryForm'
 import { SellFreeDEFForm } from './components/SellFreeDEFForm'
+import { ReturnBucketsForm } from './components/ReturnBucketsForm'
 import { TransactionLog } from './components/TransactionLog'
 import { DateSearch } from './components/DateSearch'
 import { useAuthStore } from '@/store/authStore'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import { Plus, TrendingDown } from 'lucide-react'
+import { Plus, TrendingDown, RotateCcw } from 'lucide-react'
 import type { InventoryTransaction, InventorySummary } from '@/types'
 
 export default function InventoryPage() {
@@ -19,6 +20,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showSellFreeDEFForm, setShowSellFreeDEFForm] = useState(false)
+  const [showReturnBucketsForm, setShowReturnBucketsForm] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<InventoryTransaction | null>(null)
   const [searchDate, setSearchDate] = useState<string | null>(null)
   const [freeDEFStock, setFreeDEFStock] = useState(0)
@@ -106,6 +108,14 @@ export default function InventoryPage() {
               <TrendingDown className="h-4 w-4 mr-2" />
               Sell Free DEF
             </Button>
+            <Button
+              onClick={() => setShowReturnBucketsForm(true)}
+              variant="outline"
+              className="border-green-500 text-green-700 hover:bg-green-50"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Return Buckets
+            </Button>
             <Button onClick={() => setShowAddForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Entry
@@ -142,6 +152,15 @@ export default function InventoryPage() {
             onClose={() => setShowSellFreeDEFForm(false)}
             onSuccess={fetchData}
             currentFreeDEFStock={freeDEFStock}
+          />
+        )}
+
+        {showReturnBucketsForm && (
+          <ReturnBucketsForm
+            onClose={() => setShowReturnBucketsForm(false)}
+            onSuccess={fetchData}
+            currentFreeDEFStock={freeDEFStock}
+            summary={summary}
           />
         )}
       </div>
