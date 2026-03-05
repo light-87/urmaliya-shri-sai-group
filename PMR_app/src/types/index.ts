@@ -305,6 +305,7 @@ export enum StockTransactionType {
   SELL_FREE_DEF = 'SELL_FREE_DEF',
   FILL_BUCKETS = 'FILL_BUCKETS',
   SELL_BUCKETS = 'SELL_BUCKETS',
+  RETURN_BUCKETS = 'RETURN_BUCKETS',
 }
 
 export enum StockCategory {

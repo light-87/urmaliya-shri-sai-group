@@ -154,6 +154,8 @@ export async function POST(request: NextRequest) {
       return await handleFillBuckets(validatedData)
     } else if (validatedData.type === 'SELL_BUCKETS') {
       return await handleSellBuckets(validatedData)
+    } else if (validatedData.type === 'RETURN_BUCKETS') {
+      return await handleReturnBuckets(validatedData)
     } else {
       // Handle regular transactions (ADD_UREA, SELL_FREE_DEF)
       return await handleRegularTransaction(validatedData)
@@ -353,6 +355,34 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
       quantity: -litersToSubtract,
       unit: 'LITERS',
       description: data.description || `Sold buckets: -${litersToSubtract}L`,
+      runningTotal: newRunningTotal,
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  return NextResponse.json({
+    success: true,
+    transaction,
+  })
+}
+
+// Handle returning buckets (adds liters back to Free DEF)
+async function handleReturnBuckets(data: z.infer<typeof createStockSchema>) {
+  const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const litersToAdd = Math.abs(data.quantity)
+  const newRunningTotal = freeDEFStock + litersToAdd
+
+  const { data: transaction, error } = await supabase
+    .from('StockTransaction')
+    .insert({
+      id: randomUUID(),
+      date: data.date.toISOString(),
+      type: 'RETURN_BUCKETS',
+      category: 'FREE_DEF',
+      quantity: litersToAdd,
+      unit: 'LITERS',
+      description: data.description || `Returned buckets: +${litersToAdd}L`,
       runningTotal: newRunningTotal,
     })
     .select()
