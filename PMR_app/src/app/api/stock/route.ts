@@ -286,7 +286,22 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
 
 // Handle filling buckets (auto-called from inventory)
 async function handleFillBuckets(data: z.infer<typeof createStockSchema>) {
-  const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const latestStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const { data: latestTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isBackdated = latestTransaction && new Date(data.date) < new Date(latestTransaction.date)
+
+  const freeDEFStock = isBackdated
+    ? await getStockAtDate(StockCategory.FREE_DEF, data.date)
+    : latestStock
+
   const litersNeeded = Math.abs(data.quantity)
 
   // Check if enough Free DEF is available
@@ -320,6 +335,11 @@ async function handleFillBuckets(data: z.infer<typeof createStockSchema>) {
     .single()
   if (error) throw error
 
+  // If backdated, recalculate all subsequent running totals
+  if (isBackdated) {
+    await recalculateRunningTotalsAfter(StockCategory.FREE_DEF, data.date, freeDEFStock)
+  }
+
   return NextResponse.json({
     success: true,
     transaction,
@@ -328,7 +348,22 @@ async function handleFillBuckets(data: z.infer<typeof createStockSchema>) {
 
 // Handle selling buckets (auto-called from inventory)
 async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
-  const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const latestStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const { data: latestTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isBackdated = latestTransaction && new Date(data.date) < new Date(latestTransaction.date)
+
+  const freeDEFStock = isBackdated
+    ? await getStockAtDate(StockCategory.FREE_DEF, data.date)
+    : latestStock
+
   const litersToSubtract = Math.abs(data.quantity)
 
   // Check if enough Free DEF is available
@@ -361,6 +396,11 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
     .single()
   if (error) throw error
 
+  // If backdated, recalculate all subsequent running totals
+  if (isBackdated) {
+    await recalculateRunningTotalsAfter(StockCategory.FREE_DEF, data.date, freeDEFStock)
+  }
+
   return NextResponse.json({
     success: true,
     transaction,
@@ -369,7 +409,22 @@ async function handleSellBuckets(data: z.infer<typeof createStockSchema>) {
 
 // Handle returning buckets (adds liters back to Free DEF)
 async function handleReturnBuckets(data: z.infer<typeof createStockSchema>) {
-  const freeDEFStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const latestStock = await getCurrentStock(StockCategory.FREE_DEF)
+  const { data: latestTransaction } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isBackdated = latestTransaction && new Date(data.date) < new Date(latestTransaction.date)
+
+  const freeDEFStock = isBackdated
+    ? await getStockAtDate(StockCategory.FREE_DEF, data.date)
+    : latestStock
+
   const litersToAdd = Math.abs(data.quantity)
   const newRunningTotal = freeDEFStock + litersToAdd
 
@@ -388,6 +443,11 @@ async function handleReturnBuckets(data: z.infer<typeof createStockSchema>) {
     .select()
     .single()
   if (error) throw error
+
+  // If backdated, recalculate all subsequent running totals
+  if (isBackdated) {
+    await recalculateRunningTotalsAfter(StockCategory.FREE_DEF, data.date, freeDEFStock)
+  }
 
   return NextResponse.json({
     success: true,
