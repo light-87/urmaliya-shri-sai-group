@@ -14,6 +14,7 @@ import {
   BucketType,
   Warehouse,
 } from '@/types'
+import { UREA_PER_BATCH_KG, LITERS_PER_BATCH } from '@/types'
 import { startOfDay, endOfDay, subDays, format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -378,7 +379,7 @@ function calculateProductionMetrics(
       : 0
 
   // Calculate efficiency: actual produced / theoretical max
-  const theoreticalMax = (ureaConsumed / 360) * 1000
+  const theoreticalMax = (ureaConsumed / UREA_PER_BATCH_KG) * LITERS_PER_BATCH
   const productionEfficiency =
     theoreticalMax > 0 ? (litersProduced / theoreticalMax) * 100 : 0
 

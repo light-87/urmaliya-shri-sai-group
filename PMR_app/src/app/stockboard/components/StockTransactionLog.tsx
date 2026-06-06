@@ -1,15 +1,25 @@
 import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { STOCK_TYPE_LABELS, STOCK_CATEGORY_LABELS } from '@/types'
 import type { StockTransaction } from '@/types'
-import { ArrowUp, ArrowDown, Factory, Package, TrendingDown } from 'lucide-react'
+import { ArrowUp, ArrowDown, Factory, Package, TrendingDown, Pencil, Trash2 } from 'lucide-react'
 
 interface StockTransactionLogProps {
   transactions: StockTransaction[]
-  onRefresh: () => void
+  isAdmin: boolean
+  onDelete: (id: string, label: string) => void
+  onEditUrea: (transaction: StockTransaction) => void
+  onEditBatch: (group: StockTransaction[]) => void
 }
 
-export function StockTransactionLog({ transactions }: StockTransactionLogProps) {
+export function StockTransactionLog({
+  transactions,
+  isAdmin,
+  onDelete,
+  onEditUrea,
+  onEditBatch,
+}: StockTransactionLogProps) {
   // Filter out SELL_FREE_DEF transactions (they appear in Inventory page instead)
   const filteredTransactions = transactions.filter(t => t.type !== 'SELL_FREE_DEF')
 
@@ -45,45 +55,40 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
     }
   }
 
-  // Group production batch transactions
+  // Group production batch transactions.
+  // Each production writes exactly 2 adjacent rows (UREA - and FREE_DEF +)
+  // sharing the same date. Pair a row strictly with its immediate neighbour
+  // when the categories complement each other — this stays correct when
+  // several productions share one date (each becomes its own card).
+  // NOTE: the DELETE handler in api/stock/[id]/route.ts pairs legs with this
+  // same walk — keep the two in sync.
   const groupedTransactions: Array<StockTransaction | StockTransaction[]> = []
   let i = 0
   while (i < filteredTransactions.length) {
     const current = filteredTransactions[i]
+    const next = filteredTransactions[i + 1]
 
-    // Check if this is a production batch
-    if (current.type === 'PRODUCE_BATCH') {
-      // Find related transactions (same date and type)
-      const batchGroup = [current]
-      let j = i + 1
+    const isProductionPair =
+      current.type === 'PRODUCE_BATCH' &&
+      next?.type === 'PRODUCE_BATCH' &&
+      new Date(next.date).getTime() === new Date(current.date).getTime() &&
+      ((current.category === 'UREA' && next.category === 'FREE_DEF') ||
+        (current.category === 'FREE_DEF' && next.category === 'UREA'))
 
-      // Look ahead for the next 2 transactions (should be same date and PRODUCE_BATCH)
-      while (j < filteredTransactions.length && j < i + 3) {
-        const next = filteredTransactions[j]
-        if (next.type === 'PRODUCE_BATCH' &&
-            new Date(next.date).getTime() === new Date(current.date).getTime() &&
-            new Date(next.createdAt).getTime() - new Date(current.createdAt).getTime() < 1000) {
-          batchGroup.push(next)
-          j++
-        } else {
-          break
-        }
-      }
-
-      // If we found a group of 2 (UREA, FREE_DEF), group them
-      // Note: FINISHED_GOODS = FREE_DEF, so production batches only create 2 transactions
-      if (batchGroup.length === 2) {
-        groupedTransactions.push(batchGroup)
-        i = j
-      } else {
-        groupedTransactions.push(current)
-        i++
-      }
+    if (isProductionPair) {
+      groupedTransactions.push([current, next])
+      i += 2
     } else {
       groupedTransactions.push(current)
       i++
     }
   }
+
+  // Only transactions created from this page are editable here. Bucket
+  // transactions mirror inventory entries and must be managed from the
+  // Inventory page so both tables stay in sync.
+  const isManagedFromInventory = (type: string) =>
+    type === 'FILL_BUCKETS' || type === 'SELL_BUCKETS' || type === 'RETURN_BUCKETS'
 
   return (
     <Card>
@@ -102,7 +107,6 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
               if (Array.isArray(item)) {
                 const ureaTransaction = item.find(t => t.category === 'UREA')
                 const freeDEFTransaction = item.find(t => t.category === 'FREE_DEF')
-                const finishedGoodsTransaction = item.find(t => t.category === 'FINISHED_GOODS')
 
                 return (
                   <div
@@ -114,7 +118,36 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
                         <Factory className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium text-purple-900">Production Batch</div>
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-purple-900">Production Batch</div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onEditBatch(item)}
+                                className="h-11 w-11"
+                                aria-label="Edit production batch"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  onDelete(
+                                    ureaTransaction?.id || item[0].id,
+                                    `production batch of ${format(new Date(item[0].date), 'MMM dd, yyyy')} (both Urea and Free DEF entries)`
+                                  )
+                                }
+                                className="h-11 w-11 text-destructive hover:text-destructive"
+                                aria-label="Delete production batch"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(item[0].date), 'MMM dd, yyyy')}
                         </p>
@@ -135,11 +168,19 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
                               </span>
                             </div>
                           )}
-                          {finishedGoodsTransaction && (
+                          {ureaTransaction && (
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Finished Goods:</span>
-                              <span className="font-semibold text-green-600">
-                                +{finishedGoodsTransaction.quantity.toFixed(1)} {finishedGoodsTransaction.unit}
+                              <span className="text-muted-foreground">Urea Balance:</span>
+                              <span className="font-medium">
+                                {ureaTransaction.runningTotal.toFixed(1)} {ureaTransaction.unit}
+                              </span>
+                            </div>
+                          )}
+                          {freeDEFTransaction && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Free DEF Balance:</span>
+                              <span className="font-medium">
+                                {freeDEFTransaction.runningTotal.toFixed(1)} {freeDEFTransaction.unit}
                               </span>
                             </div>
                           )}
@@ -181,6 +222,11 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
                       <p className="text-xs text-muted-foreground mt-1">
                         {format(new Date(transaction.date), 'MMM dd, yyyy')}
                       </p>
+                      {isAdmin && isManagedFromInventory(transaction.type) && (
+                        <p className="text-xs text-muted-foreground/70 mt-1 italic">
+                          Managed from Inventory page
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right ml-4">
@@ -190,6 +236,51 @@ export function StockTransactionLog({ transactions }: StockTransactionLogProps) 
                     <p className="text-sm text-muted-foreground mt-1">
                       Balance: {transaction.runningTotal.toFixed(1)} {transaction.unit}
                     </p>
+                    {isAdmin && transaction.type === 'ADD_UREA' && (
+                      <div className="flex items-center justify-end gap-1 mt-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEditUrea(transaction)}
+                          className="h-11 w-11"
+                          aria-label="Edit transaction"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            onDelete(
+                              transaction.id,
+                              `${STOCK_TYPE_LABELS[transaction.type]} of ${format(new Date(transaction.date), 'MMM dd, yyyy')} (${transaction.quantity >= 0 ? '+' : ''}${transaction.quantity.toFixed(1)} ${transaction.unit})`
+                            )
+                          }
+                          className="h-11 w-11 text-destructive hover:text-destructive"
+                          aria-label="Delete transaction"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    {isAdmin && transaction.type === 'PRODUCE_BATCH' && (
+                      <div className="flex items-center justify-end gap-1 mt-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            onDelete(
+                              transaction.id,
+                              `unpaired production entry of ${format(new Date(transaction.date), 'MMM dd, yyyy')} (${transaction.quantity >= 0 ? '+' : ''}${transaction.quantity.toFixed(1)} ${transaction.unit})`
+                            )
+                          }
+                          className="h-11 w-11 text-destructive hover:text-destructive"
+                          aria-label="Delete transaction"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

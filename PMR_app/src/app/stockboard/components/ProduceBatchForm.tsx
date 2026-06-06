@@ -25,14 +25,25 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
+export interface EditBatchInfo {
+  ureaLegId: string
+  date: string
+  batchCount: number
+}
+
 interface ProduceBatchFormProps {
   onClose: () => void
   currentUreaStock: number
+  editBatch?: EditBatchInfo
 }
 
-export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchFormProps) {
+export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: ProduceBatchFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Edit = delete old pair + recreate. Remember a successful delete so a
+  // retry after a failed recreate doesn't re-delete (404) and dead-end.
+  const [oldBatchDeleted, setOldBatchDeleted] = useState(false)
+  const isEditing = !!editBatch
 
   const {
     register,
@@ -42,20 +53,25 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
-      batchCount: 1,
+      date: editBatch
+        ? new Date(editBatch.date).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0],
+      batchCount: editBatch?.batchCount || 1,
     },
   })
 
   const batchCount = watch('batchCount') || 1
   const totalUreaNeeded = UREA_PER_BATCH_KG * batchCount
   const totalLitersProduced = LITERS_PER_BATCH * batchCount
-  const hasEnoughUrea = currentUreaStock >= totalUreaNeeded
+  // When editing, deleting the old batch first restores its Urea, so that
+  // amount is available for the replacement batch.
+  const availableUreaStock = currentUreaStock + (editBatch ? editBatch.batchCount * UREA_PER_BATCH_KG : 0)
+  const hasEnoughUrea = availableUreaStock >= totalUreaNeeded
   const ureaBags = UREA_PER_BATCH_KG / KG_PER_BAG
 
   const onSubmit = async (data: FormData) => {
     if (!hasEnoughUrea) {
-      setError(`Insufficient Urea. Need ${totalUreaNeeded.toFixed(1)}kg, have ${currentUreaStock.toFixed(1)}kg`)
+      setError(`Insufficient Urea. Need ${totalUreaNeeded.toFixed(1)}kg, have ${availableUreaStock.toFixed(1)}kg`)
       return
     }
 
@@ -63,6 +79,21 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
     setLoading(true)
 
     try {
+      // Editing replaces the whole batch: delete the old pair (both legs),
+      // then create a fresh one. Editing a single leg is blocked server-side.
+      if (editBatch && !oldBatchDeleted) {
+        const deleteResponse = await fetch(`/api/stock/${editBatch.ureaLegId}`, {
+          method: 'DELETE',
+        })
+        const deleteResult = await deleteResponse.json()
+        // 404 means it is already gone — treat as deleted and continue
+        if (!deleteResult.success && deleteResponse.status !== 404) {
+          setError(deleteResult.message || 'Failed to remove the old production batch')
+          return
+        }
+        setOldBatchDeleted(true)
+      }
+
       const response = await fetch('/api/stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +112,11 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
       if (result.success) {
         onClose()
       } else {
-        setError(result.message || 'Failed to produce batch')
+        setError(
+          isEditing
+            ? `The old batch was removed but the new one could not be created: ${result.message || 'unknown error'}. Please produce the batch again.`
+            : result.message || 'Failed to produce batch'
+        )
       }
     } catch {
       setError('Something went wrong')
@@ -94,9 +129,11 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Produce Batch</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Production Batch' : 'Produce Batch'}</DialogTitle>
           <DialogDescription>
-            Create production batches: {UREA_PER_BATCH_KG}kg Urea → {LITERS_PER_BATCH}L Free DEF per batch
+            {isEditing
+              ? `Replaces the existing batch: ${UREA_PER_BATCH_KG}kg Urea → ${LITERS_PER_BATCH}L Free DEF per batch`
+              : `Create production batches: ${UREA_PER_BATCH_KG}kg Urea → ${LITERS_PER_BATCH}L Free DEF per batch`}
           </DialogDescription>
         </DialogHeader>
 
@@ -139,14 +176,14 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
                 </p>
                 <div className="mt-2 space-y-1 text-sm">
                   <p className={hasEnoughUrea ? 'text-green-700' : 'text-red-700'}>
-                    Current Urea: <span className="font-semibold">{currentUreaStock.toFixed(1)} kg</span>
+                    {isEditing ? 'Available Urea (after removing old batch)' : 'Current Urea'}: <span className="font-semibold">{availableUreaStock.toFixed(1)} kg</span>
                   </p>
                   <p className={hasEnoughUrea ? 'text-green-700' : 'text-red-700'}>
                     Required for {batchCount} batch{batchCount !== 1 ? 'es' : ''}: <span className="font-semibold">{totalUreaNeeded.toFixed(1)} kg ({(totalUreaNeeded / KG_PER_BAG).toFixed(1)} bags)</span>
                   </p>
                   {hasEnoughUrea && (
                     <p className="text-green-600">
-                      After production: <span className="font-semibold">{(currentUreaStock - totalUreaNeeded).toFixed(1)} kg</span>
+                      After production: <span className="font-semibold">{(availableUreaStock - totalUreaNeeded).toFixed(1)} kg</span>
                     </p>
                   )}
                 </div>
@@ -184,7 +221,9 @@ export function ProduceBatchForm({ onClose, currentUreaStock }: ProduceBatchForm
               disabled={loading || !hasEnoughUrea}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {loading ? 'Producing...' : 'Produce Batch'}
+              {loading
+                ? isEditing ? 'Saving...' : 'Producing...'
+                : isEditing ? 'Save Changes' : 'Produce Batch'}
             </Button>
           </div>
         </form>

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { BucketType, Warehouse, ActionType, StockCategory, StockTransactionType, BUCKET_SIZES } from '@/types'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,191 @@ const updateInventorySchema = z.object({
   quantity: z.number().positive().optional(),
   buyerSeller: z.string().min(1).optional(),
 })
+
+// --- StockTransaction mirror helpers ---------------------------------------
+// SELL inventory transactions are mirrored into StockTransaction as Free DEF
+// liter deductions:
+//   - FACTORY + FREE_DEF + SELL          -> SELL_FREE_DEF (loose liters)
+//   - sized bucket (BUCKET_SIZES > 0) + SELL -> SELL_BUCKETS (qty x size)
+// Edits and deletes must keep that mirror in sync, otherwise the Free DEF
+// balance on the StockBoard drifts away from the inventory ledger.
+
+interface MirrorSpec {
+  type: StockTransactionType
+  category: StockCategory
+  quantity: number // signed; negative = liters deducted from Free DEF
+  description: string
+}
+
+function getMirrorSpec(tx: {
+  warehouse: string
+  bucketType: string
+  action: string
+  quantity: number
+  buyerSeller: string
+}): MirrorSpec | null {
+  if (tx.action !== 'SELL') return null
+
+  if (tx.warehouse === Warehouse.FACTORY && tx.bucketType === BucketType.FREE_DEF) {
+    const liters = Math.abs(tx.quantity)
+    return {
+      type: StockTransactionType.SELL_FREE_DEF,
+      category: StockCategory.FREE_DEF,
+      quantity: -liters,
+      description: `Sold ${liters}L Free DEF to ${tx.buyerSeller}`,
+    }
+  }
+
+  const bucketSize = BUCKET_SIZES[tx.bucketType as BucketType] || 0
+  if (bucketSize > 0) {
+    const buckets = Math.abs(tx.quantity)
+    return {
+      type: StockTransactionType.SELL_BUCKETS,
+      category: StockCategory.FREE_DEF,
+      quantity: -(buckets * bucketSize),
+      description: `Sold ${buckets}x ${tx.bucketType} (${buckets * bucketSize}L) to ${tx.buyerSeller}`,
+    }
+  }
+
+  return null
+}
+
+// Find the single StockTransaction that mirrors this inventory row. Several
+// rows can share (date, type, category) — e.g. two identical sales on one
+// day — so require an exact quantity match and break ties with the closest
+// createdAt (the mirror is inserted right after the inventory row). Returns
+// null when no exact match exists: deleting a different-quantity row would
+// destroy another sale's ledger entry, which is worse than leaving an
+// orphan for the admin fix-stock tools to reconcile.
+async function findMirrorTransaction(
+  inventoryTx: { date: string; createdAt: string },
+  spec: MirrorSpec
+) {
+  const { data: candidates, error } = await supabase
+    .from('StockTransaction')
+    .select('*')
+    .eq('date', inventoryTx.date)
+    .eq('type', spec.type)
+    .eq('category', spec.category)
+    .eq('quantity', spec.quantity)
+
+  if (error) throw error
+  if (!candidates || candidates.length === 0) return null
+
+  const inventoryCreatedAt = new Date(inventoryTx.createdAt).getTime()
+  candidates.sort(
+    (a, b) =>
+      Math.abs(new Date(a.createdAt).getTime() - inventoryCreatedAt) -
+      Math.abs(new Date(b.createdAt).getTime() - inventoryCreatedAt)
+  )
+
+  return candidates[0]
+}
+
+// Get the latest running balance for a stock category
+async function getStockBalance(category: StockCategory): Promise<number> {
+  const { data: lastTx } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', category)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  return lastTx?.runningTotal || 0
+}
+
+// Get the running balance available at a specific date (backdated-aware).
+// For a backdated edit the deduction must fit the balance AT that date —
+// the latest balance may include stock that didn't exist yet.
+async function getStockBalanceAt(category: StockCategory, dateISO: string): Promise<number> {
+  const { data: latestTx } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', category)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isBackdated = latestTx && new Date(dateISO) < new Date(latestTx.date)
+  if (!isBackdated) {
+    return getStockBalance(category)
+  }
+
+  const { data: priorTx } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', category)
+    .lt('date', dateISO)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  return priorTx?.runningTotal || 0
+}
+
+// Recalculate StockTransaction running totals for a category from a given
+// date onwards by replaying quantities on top of the balance just before
+// that date. All transactions on one calendar date share the same midnight
+// timestamp, so a blind "+amount" shift would also move same-date rows that
+// occurred BEFORE the affected one — replaying avoids that.
+async function recalculateStockTotalsFrom(category: StockCategory, fromDate: string) {
+  const { data: prior } = await supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', category)
+    .lt('date', fromDate)
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const baseline = prior?.runningTotal || 0
+
+  const { data: transactions, error } = await supabase
+    .from('StockTransaction')
+    .select('id, quantity')
+    .eq('category', category)
+    .gte('date', fromDate)
+    .order('date', { ascending: true })
+    .order('createdAt', { ascending: true })
+
+  if (error) throw error
+
+  let runningTotal = baseline
+  for (const tx of transactions || []) {
+    runningTotal += tx.quantity
+    const { error: updateError } = await supabase
+      .from('StockTransaction')
+      .update({ runningTotal })
+      .eq('id', tx.id)
+    if (updateError) throw updateError
+  }
+}
+
+// Create the mirror StockTransaction for an inventory row. The running
+// total is corrected afterwards by recalculateStockTotalsFrom.
+async function createMirrorTransaction(dateISO: string, spec: MirrorSpec) {
+  const currentBalance = await getStockBalance(spec.category)
+
+  const { error } = await supabase
+    .from('StockTransaction')
+    .insert({
+      id: randomUUID(),
+      date: dateISO,
+      type: spec.type,
+      category: spec.category,
+      quantity: spec.quantity,
+      unit: 'LITERS',
+      description: spec.description,
+      runningTotal: currentBalance + spec.quantity,
+    })
+
+  if (error) throw error
+}
 
 // PUT - Update inventory transaction (Admin only)
 export async function PUT(
@@ -80,6 +266,46 @@ export async function PUT(
       buyerSeller: validatedData.buyerSeller || existing.buyerSeller,
     }
 
+    const newDateISO = validatedData.date
+      ? validatedData.date.toISOString()
+      : existing.date
+
+    // Work out how the edit affects the mirrored Free DEF stock entry
+    const oldSpec = getMirrorSpec(existing)
+    const newSpec = getMirrorSpec({ ...updatedData, quantity: updatedData.quantity })
+
+    // If the edit deducts MORE Free DEF than before, make sure it's
+    // available at the (possibly backdated) transaction date
+    if (newSpec) {
+      const oldLiters = oldSpec ? Math.abs(oldSpec.quantity) : 0
+      const extraLiters = Math.abs(newSpec.quantity) - oldLiters
+      if (extraLiters > 0) {
+        const freeDEFBalance = await getStockBalanceAt(StockCategory.FREE_DEF, newDateISO)
+        if (freeDEFBalance < extraLiters) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Insufficient Free DEF for this change. It needs ${extraLiters}L more, but only ${freeDEFBalance}L is available.`,
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    // Locate the old mirror BEFORE updating, but only delete it AFTER the
+    // inventory update succeeds — deleting first could leave the deduction
+    // missing if the update fails.
+    const oldMirror = oldSpec ? await findMirrorTransaction(existing, oldSpec) : null
+    if (oldSpec && !oldMirror) {
+      // The mirror this row should have is missing or no longer matches
+      // (pre-existing desync). Don't create a fresh one — replaying both
+      // would double-deduct. Leave the stock side untouched and warn.
+      console.error(
+        `Inventory PUT: expected mirror StockTransaction not found for inventory ${id} (${oldSpec.type} ${oldSpec.quantity}L on ${existing.date}) — skipping mirror sync`
+      )
+    }
+
     // Prepare update payload
     const updatePayload: Record<string, any> = {}
     if (validatedData.date) updatePayload.date = validatedData.date.toISOString()
@@ -98,6 +324,28 @@ export async function PUT(
       .single()
 
     if (updateError) throw updateError
+
+    // Sync the mirror: replace the old one with one built from new values.
+    // Skipped when the old mirror was expected but missing (see above).
+    const syncMirror = !oldSpec || !!oldMirror
+    if (syncMirror) {
+      if (oldMirror) {
+        const { error: mirrorDeleteError } = await supabase
+          .from('StockTransaction')
+          .delete()
+          .eq('id', oldMirror.id)
+        if (mirrorDeleteError) throw mirrorDeleteError
+      }
+      if (newSpec) {
+        await createMirrorTransaction(newDateISO, newSpec)
+      }
+      // Replay Free DEF running totals from the earliest affected date
+      if (oldMirror || newSpec) {
+        const fromDate =
+          new Date(existing.date) <= new Date(newDateISO) ? existing.date : newDateISO
+        await recalculateStockTotalsFrom(StockCategory.FREE_DEF, fromDate)
+      }
+    }
 
     // Recalculate running totals for all subsequent transactions
     await recalculateRunningTotals(
@@ -170,64 +418,20 @@ export async function DELETE(
       )
     }
 
-    // If this is a FACTORY + FREE_DEF transaction (from Sell Free DEF),
-    // we need to also delete the corresponding StockTransactions
-    if (transaction.warehouse === Warehouse.FACTORY && transaction.bucketType === BucketType.FREE_DEF && transaction.action === ActionType.SELL) {
-      try {
-        const restoreAmount = Math.abs(transaction.quantity)
-        const { data: stockTransactionsToDelete, error: stockFetchError } = await supabase
+    // Delete the mirrored Free DEF stock entry (if any), then replay the
+    // category's running totals. Deleting exactly one matched row keeps a
+    // second identical sale on the same day intact.
+    const spec = getMirrorSpec(transaction)
+    if (spec) {
+      const mirror = await findMirrorTransaction(transaction, spec)
+      if (mirror) {
+        const { error: mirrorDeleteError } = await supabase
           .from('StockTransaction')
-          .select('*')
-          .eq('date', transaction.date)
-          .eq('type', StockTransactionType.SELL_FREE_DEF)
-          .eq('quantity', -restoreAmount)
+          .delete()
+          .eq('id', mirror.id)
+        if (mirrorDeleteError) throw mirrorDeleteError
 
-        if (!stockFetchError && stockTransactionsToDelete && stockTransactionsToDelete.length > 0) {
-          for (const st of stockTransactionsToDelete) {
-            await supabase
-              .from('StockTransaction')
-              .delete()
-              .eq('id', st.id)
-          }
-          // Shift running totals forward from this date — do NOT recalculate from 0
-          await shiftStockRunningTotals(StockCategory.FREE_DEF, transaction.date, restoreAmount)
-          await shiftStockRunningTotals(StockCategory.FINISHED_GOODS, transaction.date, restoreAmount)
-        }
-      } catch (stockError) {
-        console.error('Failed to delete/recalculate stock transactions:', stockError)
-        // Continue anyway - at least delete the inventory transaction
-      }
-    }
-
-    // If this is a SELL of a DEF bucket, delete the corresponding SELL_BUCKETS StockTransaction
-    // STOCK action (adding empty buckets) never creates a StockTransaction, so skip it
-    const bucketSize = await getBucketSize(transaction.bucketType)
-    if (bucketSize > 0 && transaction.action === ActionType.SELL) {
-      try {
-        const expectedQuantity = -(Math.abs(transaction.quantity) * bucketSize)
-        const restoreAmount = Math.abs(expectedQuantity)
-
-        const { data: stockTransactionsToDelete, error: stockFetchError } = await supabase
-          .from('StockTransaction')
-          .select('*')
-          .eq('date', transaction.date)
-          .eq('type', StockTransactionType.SELL_BUCKETS)
-          .eq('category', StockCategory.FREE_DEF)
-          .eq('quantity', expectedQuantity)
-
-        if (!stockFetchError && stockTransactionsToDelete && stockTransactionsToDelete.length > 0) {
-          for (const st of stockTransactionsToDelete) {
-            await supabase
-              .from('StockTransaction')
-              .delete()
-              .eq('id', st.id)
-          }
-          // Shift running totals forward from this date — do NOT recalculate from 0
-          await shiftStockRunningTotals(StockCategory.FREE_DEF, transaction.date, restoreAmount)
-        }
-      } catch (stockError) {
-        console.error('Failed to delete/recalculate stock transactions:', stockError)
-        // Continue anyway
+        await recalculateStockTotalsFrom(spec.category, transaction.date)
       }
     }
 
@@ -283,37 +487,4 @@ async function recalculateRunningTotals(
       .update({ runningTotal })
       .eq('id', transaction.id)
   }
-}
-
-// Helper function to restore StockTransaction running totals after a deletion.
-// Instead of recalculating from 0 (which would corrupt historical data), we
-// shift all entries from `fromDate` onwards by +amount, reversing the deleted entry.
-async function shiftStockRunningTotals(
-  category: StockCategory,
-  fromDate: string,
-  amount: number  // positive number — the liters to add back
-) {
-  try {
-    const { data: txsToUpdate } = await supabase
-      .from('StockTransaction')
-      .select('id, runningTotal')
-      .eq('category', category)
-      .gte('date', fromDate)
-
-    if (txsToUpdate) {
-      for (const tx of txsToUpdate) {
-        await supabase
-          .from('StockTransaction')
-          .update({ runningTotal: tx.runningTotal + amount })
-          .eq('id', tx.id)
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to shift stock running totals for ${category}:`, error)
-  }
-}
-
-// Helper function to get bucket size
-async function getBucketSize(bucketType: BucketType): Promise<number> {
-  return BUCKET_SIZES[bucketType] || 0
 }

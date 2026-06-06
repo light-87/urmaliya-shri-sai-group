@@ -56,6 +56,25 @@ export async function PUT(
       )
     }
 
+    // Production batches are two linked transactions (UREA + FREE_DEF).
+    // Editing one leg would desync the pair, so block direct edits.
+    if (existing.type === 'PRODUCE_BATCH') {
+      return NextResponse.json(
+        { success: false, message: 'Production batches cannot be edited directly. Delete and re-create instead.' },
+        { status: 400 }
+      )
+    }
+
+    // Bucket/sale entries mirror InventoryTransaction rows — editing them
+    // here would desync the two ledgers. They must be edited from the
+    // Inventory page, which keeps the mirror in sync.
+    if (['SELL_BUCKETS', 'SELL_FREE_DEF', 'FILL_BUCKETS', 'RETURN_BUCKETS'].includes(existing.type)) {
+      return NextResponse.json(
+        { success: false, message: 'This entry mirrors an Inventory transaction. Edit it from the Inventory page instead.' },
+        { status: 400 }
+      )
+    }
+
     // Prepare update payload
     const updatePayload: Record<string, any> = {}
     if (validatedData.date) updatePayload.date = validatedData.date.toISOString()
@@ -147,16 +166,43 @@ export async function DELETE(
     // Production creates 2 transactions: UREA (decrease) and FREE_DEF (increase)
     let pairedTransaction = null
     if (transaction.type === 'PRODUCE_BATCH') {
-      // Find the paired transaction with same date, type, but different category
-      const { data: paired } = await supabase
+      // Multiple productions can share the same date (date is normalized to
+      // midnight UTC), so a date-only lookup is ambiguous. Fetch all
+      // PRODUCE_BATCH rows on that date and pair them the same way the
+      // StockBoard UI groups them (adjacent complementary categories, newest
+      // first) so the deleted pair always matches the card the user sees.
+      const { data: sameDateRows, error: pairFetchError } = await supabase
         .from('StockTransaction')
         .select('*')
         .eq('type', 'PRODUCE_BATCH')
         .eq('date', transaction.date)
-        .neq('category', transaction.category)
-        .single()
+        .order('createdAt', { ascending: false })
 
-      pairedTransaction = paired
+      if (pairFetchError) throw pairFetchError
+
+      const rows = sameDateRows || []
+      for (let i = 0; i < rows.length; i++) {
+        const current = rows[i]
+        const next = rows[i + 1]
+        const isComplementaryPair =
+          next &&
+          ((current.category === 'UREA' && next.category === 'FREE_DEF') ||
+            (current.category === 'FREE_DEF' && next.category === 'UREA'))
+
+        if (isComplementaryPair) {
+          if (current.id === id) {
+            pairedTransaction = next
+            break
+          }
+          if (next.id === id) {
+            pairedTransaction = current
+            break
+          }
+          i++ // skip the consumed pair, mirroring the UI grouping walk
+        } else if (current.id === id) {
+          break // target has no pair (orphaned leg) — delete it alone
+        }
+      }
     }
 
     // Validate that deletion won't cause negative stock
@@ -211,9 +257,9 @@ export async function DELETE(
         .delete()
         .eq('id', pairedTransaction.id)
 
-      if (pairedDeleteError) {
-        console.error('Failed to delete paired transaction:', pairedDeleteError)
-      }
+      // Surface the failure loudly — a silently half-deleted production
+      // corrupts both category balances.
+      if (pairedDeleteError) throw pairedDeleteError
     }
 
     // Recalculate running totals for the deleted transaction's category

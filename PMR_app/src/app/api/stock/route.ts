@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { StockTransactionType, StockCategory, StockUnit, BucketType } from '@/types'
-import { BUCKET_SIZES, UREA_PER_BATCH_KG, LITERS_PER_BATCH } from '@/types'
+import { BUCKET_SIZES, UREA_PER_BATCH_KG, LITERS_PER_BATCH, KG_PER_BAG } from '@/types'
 import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -457,6 +457,11 @@ async function handleReturnBuckets(data: z.infer<typeof createStockSchema>) {
 
 // Handle regular transactions (ADD_UREA, SELL_FREE_DEF)
 async function handleRegularTransaction(data: z.infer<typeof createStockSchema>) {
+  // Sales always deduct stock — normalize the sign so a positive quantity
+  // from a malformed request cannot add phantom stock or skip the
+  // sufficiency check below
+  const quantity = data.type === 'SELL_FREE_DEF' ? -Math.abs(data.quantity) : data.quantity
+
   // Check if this is a backdated transaction
   const latestStock = await getCurrentStock(data.category)
   const { data: latestTransaction } = await supabase
@@ -476,8 +481,8 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
     : latestStock
 
   // For selling Free DEF, check if enough stock is available at that date
-  if (data.type === 'SELL_FREE_DEF' && data.quantity < 0) {
-    const quantityToSell = Math.abs(data.quantity)
+  if (data.type === 'SELL_FREE_DEF') {
+    const quantityToSell = Math.abs(quantity)
     if (stockAtDate < quantityToSell) {
       return NextResponse.json(
         {
@@ -490,7 +495,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
     }
   }
 
-  const newRunningTotal = stockAtDate + data.quantity
+  const newRunningTotal = stockAtDate + quantity
 
   // For SELL_FREE_DEF, also create InventoryTransaction
   // Note: Finished Goods = Free DEF, so we don't create separate FINISHED_GOODS transaction
@@ -503,7 +508,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
         date: data.date.toISOString(),
         type: data.type,
         category: data.category,
-        quantity: data.quantity,
+        quantity: quantity,
         unit: data.unit,
         description: data.description,
         runningTotal: newRunningTotal,
@@ -522,7 +527,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
         warehouse: 'FACTORY',
         bucketType: 'FREE_DEF',
         action: 'SELL',
-        quantity: data.quantity, // Store as negative for sell
+        quantity: quantity, // Store as negative for sell
         buyerSeller: data.description?.split(' to ').pop()?.trim() || 'Customer',
         runningTotal: newRunningTotal, // Use Free DEF stock balance
       })
@@ -549,7 +554,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
       date: data.date.toISOString(),
       type: data.type,
       category: data.category,
-      quantity: data.quantity,
+      quantity: quantity,
       unit: data.unit,
       description: data.description,
       runningTotal: newRunningTotal,
@@ -645,8 +650,8 @@ async function calculateStockSummary() {
 
   return {
     ureaKg,
-    ureaBags: Number((ureaKg / 45).toFixed(2)),
-    ureaCansProduceL: Math.floor(ureaKg / 360) * 1000,
+    ureaBags: Number((ureaKg / KG_PER_BAG).toFixed(2)),
+    ureaCansProduceL: Math.floor(ureaKg / UREA_PER_BATCH_KG) * LITERS_PER_BATCH,
     freeDEF,
     bucketsInLiters,
     finishedGoods,

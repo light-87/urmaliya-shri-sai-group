@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { KG_PER_BAG } from '@/types'
+import type { StockTransaction } from '@/types'
 import { AlertCircle } from 'lucide-react'
 
 const formSchema = z.object({
@@ -27,11 +28,13 @@ type FormData = z.infer<typeof formSchema>
 
 interface AddUreaFormProps {
   onClose: () => void
+  editTransaction?: StockTransaction
 }
 
-export function AddUreaForm({ onClose }: AddUreaFormProps) {
+export function AddUreaForm({ onClose, editTransaction }: AddUreaFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const isEditing = !!editTransaction
 
   const {
     register,
@@ -41,9 +44,11 @@ export function AddUreaForm({ onClose }: AddUreaFormProps) {
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
-      quantityKg: 0,
-      description: '',
+      date: editTransaction
+        ? new Date(editTransaction.date).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0],
+      quantityKg: editTransaction ? editTransaction.quantity : 0,
+      description: editTransaction?.description || '',
     },
   })
 
@@ -55,25 +60,35 @@ export function AddUreaForm({ onClose }: AddUreaFormProps) {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: data.date,
-          type: 'ADD_UREA',
-          category: 'UREA',
-          quantity: data.quantityKg,
-          unit: 'KG',
-          description: data.description || `Added ${data.quantityKg}kg Urea`,
-        }),
-      })
+      const response = isEditing
+        ? await fetch(`/api/stock/${editTransaction.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date: data.date,
+              quantity: data.quantityKg,
+              description: data.description || `Added ${data.quantityKg}kg Urea`,
+            }),
+          })
+        : await fetch('/api/stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date: data.date,
+              type: 'ADD_UREA',
+              category: 'UREA',
+              quantity: data.quantityKg,
+              unit: 'KG',
+              description: data.description || `Added ${data.quantityKg}kg Urea`,
+            }),
+          })
 
       const result = await response.json()
 
       if (result.success) {
         onClose()
       } else {
-        setError(result.message || 'Failed to add Urea')
+        setError(result.message || (isEditing ? 'Failed to update Urea entry' : 'Failed to add Urea'))
       }
     } catch {
       setError('Something went wrong')
@@ -86,7 +101,7 @@ export function AddUreaForm({ onClose }: AddUreaFormProps) {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Urea Stock</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Urea Entry' : 'Add Urea Stock'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -143,7 +158,9 @@ export function AddUreaForm({ onClose }: AddUreaFormProps) {
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Urea'}
+              {loading
+                ? isEditing ? 'Saving...' : 'Adding...'
+                : isEditing ? 'Save Changes' : 'Add Urea'}
             </Button>
           </div>
         </form>

@@ -143,6 +143,33 @@ export async function POST(request: NextRequest) {
       // User confirmed, allow overselling
     }
 
+    // For sized-bucket sales, verify enough Free DEF exists BEFORE writing
+    // anything — the auto stock deduction further down must never fail after
+    // the inventory row has already been committed.
+    const bucketSize = BUCKET_SIZES[validatedData.bucketType]
+    if (bucketSize > 0 && validatedData.action === 'SELL') {
+      // Skip the check while the StockTransaction migration is pending
+      const { error: tableError } = await supabase
+        .from('StockTransaction')
+        .select('id')
+        .limit(1)
+
+      if (!(tableError && tableError.code === '42P01')) {
+        const litersNeeded = validatedData.quantity * bucketSize
+        const freeDEFStock = await getFreeDEFStockAt(validatedData.date)
+        if (freeDEFStock < litersNeeded) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Insufficient Free DEF to sell these buckets. Need ${litersNeeded}L, have ${freeDEFStock}L`,
+              currentStock: freeDEFStock,
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
     const newRunningTotal = stockAtDate + signedQuantity
 
     // Create transaction
@@ -174,7 +201,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-update stock tracking (only if StockTransaction table exists)
-    const bucketSize = BUCKET_SIZES[validatedData.bucketType]
     if (bucketSize > 0 && validatedData.action === 'SELL') {
       // Check if StockTransaction table exists
       const { error: tableError } = await supabase
@@ -186,16 +212,41 @@ export async function POST(request: NextRequest) {
         // Table doesn't exist yet — silently skip (migration pending)
         console.log('Stock tracking not available yet (migration pending)')
       } else {
-        // Table exists — create the FREE DEF deduction (errors will propagate)
+        // Table exists — create the FREE DEF deduction
         // Note: STOCK action does nothing to Free DEF - buckets are empty containers
-        await createStockTransaction({
-          date: validatedData.date,
-          type: 'SELL_BUCKETS',
-          category: 'FREE_DEF',
-          quantity: -(validatedData.quantity * bucketSize),
-          unit: 'LITERS',
-          description: `Sold ${validatedData.quantity}x ${validatedData.bucketType} (${validatedData.quantity * bucketSize}L) to ${validatedData.buyerSeller}`,
-        })
+        try {
+          await createStockTransaction({
+            date: validatedData.date,
+            type: 'SELL_BUCKETS',
+            category: 'FREE_DEF',
+            quantity: -(validatedData.quantity * bucketSize),
+            unit: 'LITERS',
+            description: `Sold ${validatedData.quantity}x ${validatedData.bucketType} (${validatedData.quantity * bucketSize}L) to ${validatedData.buyerSeller}`,
+          })
+        } catch (stockError) {
+          // Roll back the inventory row so the two ledgers stay consistent
+          // (e.g. a concurrent sale consumed the Free DEF between our
+          // pre-check and this insert)
+          await supabase.from('InventoryTransaction').delete().eq('id', transaction.id)
+          if (isBackdated) {
+            await recalculateInventoryRunningTotalsAfter(
+              validatedData.bucketType,
+              validatedData.warehouse,
+              validatedData.date,
+              stockAtDate
+            )
+          }
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                stockError instanceof Error
+                  ? stockError.message
+                  : 'Failed to record the Free DEF deduction. The sale was not saved.',
+            },
+            { status: 400 }
+          )
+        }
       }
     }
 
@@ -254,6 +305,35 @@ async function getStockAtDate(
     .single()
 
   return lastTransaction?.runningTotal || 0
+}
+
+// Helper function to get the Free DEF stock balance available at a date
+// (backdated-aware, mirrors the balance lookup in createStockTransaction)
+async function getFreeDEFStockAt(date: Date): Promise<number> {
+  const { data: latestTx } = await supabase
+    .from('StockTransaction')
+    .select('date')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .single()
+
+  const isBackdated = latestTx && new Date(date) < new Date(latestTx.date)
+
+  const query = supabase
+    .from('StockTransaction')
+    .select('runningTotal')
+    .eq('category', 'FREE_DEF')
+    .order('date', { ascending: false })
+    .order('createdAt', { ascending: false })
+    .limit(1)
+
+  const { data: balanceTx } = isBackdated
+    ? await query.lt('date', date.toISOString()).single()
+    : await query.single()
+
+  return balanceTx?.runningTotal || 0
 }
 
 // Helper function to recalculate running totals for transactions from a given date onwards
@@ -410,6 +490,14 @@ async function createStockTransaction(data: {
       .limit(1)
       .single()
     currentStock = lastTx?.runningTotal || 0
+  }
+
+  // Never let an auto-triggered deduction silently push the balance negative
+  // (the POST handler pre-checks this; this is defense-in-depth)
+  if (data.quantity < 0 && currentStock < Math.abs(data.quantity)) {
+    throw new Error(
+      `Insufficient ${data.category} stock: need ${Math.abs(data.quantity)}L, have ${currentStock}L`
+    )
   }
 
   const newRunningTotal = currentStock + data.quantity
