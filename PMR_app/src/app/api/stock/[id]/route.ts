@@ -209,8 +209,7 @@ export async function DELETE(
     // Check what the final balance would be after deletion
     const wouldCauseNegative = await checkIfDeletionCausesNegativeStock(
       transaction.category,
-      transaction.id,
-      transaction.quantity
+      transaction.id
     )
 
     if (wouldCauseNegative) {
@@ -227,8 +226,7 @@ export async function DELETE(
     if (pairedTransaction) {
       const pairedWouldCauseNegative = await checkIfDeletionCausesNegativeStock(
         pairedTransaction.category,
-        pairedTransaction.id,
-        pairedTransaction.quantity
+        pairedTransaction.id
       )
 
       if (pairedWouldCauseNegative) {
@@ -285,18 +283,18 @@ export async function DELETE(
   }
 }
 
-// Helper function to check if deletion would cause negative stock
+// Helper function to check if deletion would cause negative stock.
+// Only blocks when THIS deletion creates a new negative balance — historical
+// dips that already exist (e.g. from backdated entries) must not block
+// unrelated deletions.
 async function checkIfDeletionCausesNegativeStock(
   category: StockCategory,
-  transactionId: string,
-  transactionQuantity: number
+  transactionId: string
 ): Promise<boolean> {
-  // Get all transactions for this category, excluding the one being deleted
   const { data: transactions, error } = await supabase
     .from('StockTransaction')
-    .select('quantity')
+    .select('id, quantity')
     .eq('category', category)
-    .neq('id', transactionId)
     .order('date', { ascending: true })
     .order('createdAt', { ascending: true })
 
@@ -304,12 +302,30 @@ async function checkIfDeletionCausesNegativeStock(
     return false // Allow deletion if we can't check
   }
 
-  // Calculate what the running total would be without this transaction
-  let runningTotal = 0
+  const target = transactions.find(tx => tx.id === transactionId)
+
+  // Removing a deduction (negative quantity) raises every later balance —
+  // it can never cause a negative.
+  if (!target || target.quantity <= 0) {
+    return false
+  }
+
+  // Replay the history with and without the deleted row. Block only when a
+  // later balance goes negative without the row while it was non-negative
+  // with it — i.e. the deletion itself creates the problem.
+  let balanceWith = 0
+  let balanceWithout = 0
+  let afterTarget = false
+
   for (const tx of transactions) {
-    runningTotal += tx.quantity
-    if (runningTotal < 0) {
-      return true // Would cause negative balance
+    balanceWith += tx.quantity
+    if (tx.id === transactionId) {
+      afterTarget = true
+      continue
+    }
+    balanceWithout += tx.quantity
+    if (afterTarget && balanceWithout < 0 && balanceWith >= 0) {
+      return true
     }
   }
 
