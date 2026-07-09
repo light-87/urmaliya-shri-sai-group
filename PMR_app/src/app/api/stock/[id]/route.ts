@@ -14,6 +14,7 @@ const updateStockSchema = z.object({
   quantity: z.number().optional(),
   unit: z.nativeEnum(StockUnit).optional(),
   description: z.string().optional(),
+  batchNo: z.string().optional(),
 })
 
 // PUT - Update stock transaction (Admin only)
@@ -83,6 +84,7 @@ export async function PUT(
     if (validatedData.quantity !== undefined) updatePayload.quantity = validatedData.quantity
     if (validatedData.unit) updatePayload.unit = validatedData.unit
     if (validatedData.description !== undefined) updatePayload.description = validatedData.description
+    if (validatedData.batchNo !== undefined) updatePayload.batchNo = validatedData.batchNo
 
     // Update the transaction
     const { data: transaction, error: updateError } = await supabase

@@ -21,6 +21,7 @@ import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react'
 const formSchema = z.object({
   date: z.string().min(1, 'Date is required'),
   batchCount: z.number().min(1, 'Must produce at least 1 batch').max(100, 'Maximum 100 batches at once'),
+  batchNo: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -29,6 +30,7 @@ export interface EditBatchInfo {
   ureaLegId: string
   date: string
   batchCount: number
+  batchNo?: string
 }
 
 interface ProduceBatchFormProps {
@@ -57,6 +59,7 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
         ? new Date(editBatch.date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
       batchCount: editBatch?.batchCount || 1,
+      batchNo: editBatch?.batchNo || '',
     },
   })
 
@@ -104,6 +107,7 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
           quantity: -totalUreaNeeded,
           unit: 'KG',
           batchCount: data.batchCount,
+          batchNo: data.batchNo,
         }),
       })
 
@@ -210,6 +214,16 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
             {errors.date && (
               <p className="text-sm text-red-500 mt-1">{errors.date.message}</p>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="batchNo">Batch No. (Optional)</Label>
+            <Input
+              id="batchNo"
+              type="text"
+              placeholder="e.g., BATCH-123"
+              {...register('batchNo')}
+            />
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">

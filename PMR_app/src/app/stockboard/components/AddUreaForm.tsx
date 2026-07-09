@@ -22,6 +22,7 @@ const formSchema = z.object({
   date: z.string().min(1, 'Date is required'),
   quantityKg: z.number().positive('Quantity must be positive'),
   description: z.string().optional(),
+  batchNo: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -49,6 +50,7 @@ export function AddUreaForm({ onClose, editTransaction }: AddUreaFormProps) {
         : new Date().toISOString().split('T')[0],
       quantityKg: editTransaction ? editTransaction.quantity : 0,
       description: editTransaction?.description || '',
+      batchNo: editTransaction?.batchNo || '',
     },
   })
 
@@ -68,6 +70,7 @@ export function AddUreaForm({ onClose, editTransaction }: AddUreaFormProps) {
               date: data.date,
               quantity: data.quantityKg,
               description: data.description || `Added ${data.quantityKg}kg Urea`,
+              batchNo: data.batchNo,
             }),
           })
         : await fetch('/api/stock', {
@@ -80,6 +83,7 @@ export function AddUreaForm({ onClose, editTransaction }: AddUreaFormProps) {
               quantity: data.quantityKg,
               unit: 'KG',
               description: data.description || `Added ${data.quantityKg}kg Urea`,
+              batchNo: data.batchNo,
             }),
           })
 
@@ -141,6 +145,16 @@ export function AddUreaForm({ onClose, editTransaction }: AddUreaFormProps) {
                 <span className="text-xs text-amber-600 ml-1">({KG_PER_BAG}kg per bag)</span>
               </p>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="batchNo">Batch No. (Optional)</Label>
+            <Input
+              id="batchNo"
+              type="text"
+              placeholder="e.g., BATCH-123"
+              {...register('batchNo')}
+            />
           </div>
 
           <div>

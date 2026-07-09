@@ -26,6 +26,7 @@ const createStockSchema = z.object({
   quantity: z.number(),
   unit: z.nativeEnum(StockUnit),
   description: z.string().optional(),
+  batchNo: z.string().optional(),
   batchCount: z.number().optional(),
 })
 
@@ -245,6 +246,7 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
       quantity: -totalUreaNeeded,
       unit: 'KG',
       description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (-${totalUreaNeeded}kg Urea)`,
+      batchNo: data.batchNo,
       runningTotal: ureaRunningTotal,
     })
     .select()
@@ -261,6 +263,7 @@ async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
       quantity: totalLitersProduced,
       unit: 'LITERS',
       description: `Production: ${batchCount} batch${batchCount !== 1 ? 'es' : ''} (+${totalLitersProduced}L Free DEF)`,
+      batchNo: data.batchNo,
       runningTotal: freeDEFRunningTotal,
     })
     .select()
@@ -557,6 +560,7 @@ async function handleRegularTransaction(data: z.infer<typeof createStockSchema>)
       quantity: quantity,
       unit: data.unit,
       description: data.description,
+      batchNo: data.batchNo,
       runningTotal: newRunningTotal,
     })
     .select()

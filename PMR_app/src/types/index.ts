@@ -328,6 +328,7 @@ export interface StockTransaction {
   quantity: number
   unit: StockUnit
   description?: string
+  batchNo?: string
   runningTotal: number
   createdAt: string
   updatedAt: string
@@ -354,6 +355,7 @@ export interface StockInput {
   quantity: number
   unit: StockUnit
   description?: string
+  batchNo?: string
 }
 
 // Stock constants

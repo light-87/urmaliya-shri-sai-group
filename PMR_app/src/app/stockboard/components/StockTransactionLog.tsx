@@ -150,6 +150,7 @@ export function StockTransactionLog({
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(item[0].date), 'MMM dd, yyyy')}
+                          {item[0].batchNo && ` • Batch: ${item[0].batchNo}`}
                         </p>
                         <div className="mt-3 space-y-2 text-sm">
                           {ureaTransaction && (
@@ -221,6 +222,7 @@ export function StockTransactionLog({
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {format(new Date(transaction.date), 'MMM dd, yyyy')}
+                        {transaction.batchNo && ` • Batch: ${transaction.batchNo}`}
                       </p>
                       {isAdmin && isManagedFromInventory(transaction.type) && (
                         <p className="text-xs text-muted-foreground/70 mt-1 italic">
