@@ -15,12 +15,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { UREA_PER_BATCH_KG, LITERS_PER_BATCH, KG_PER_BAG } from '@/types'
+import { KG_PER_BAG } from '@/types'
 import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react'
 
 const formSchema = z.object({
   date: z.string().min(1, 'Date is required'),
-  batchCount: z.number().min(1, 'Must produce at least 1 batch').max(100, 'Maximum 100 batches at once'),
+  batchCount: z.number({ invalid_type_error: 'Enter the number of batches' }).int('Whole batches only').min(1, 'Must produce at least 1 batch').max(100, 'Maximum 100 batches at once'),
+  // Entered by hand: the real figures vary per batch and per machine
+  ureaKg: z.number({ invalid_type_error: 'Enter the urea used' }).positive('Urea used must be more than 0'),
+  litersProduced: z.number({ invalid_type_error: 'Enter the litres produced' }).positive('Litres produced must be more than 0'),
   batchNo: z.string().optional(),
 })
 
@@ -30,6 +33,8 @@ export interface EditBatchInfo {
   ureaLegId: string
   date: string
   batchCount: number
+  ureaKg: number
+  litersProduced: number
   batchNo?: string
 }
 
@@ -59,18 +64,20 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
         ? new Date(editBatch.date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
       batchCount: editBatch?.batchCount || 1,
+      ureaKg: editBatch?.ureaKg,
+      litersProduced: editBatch?.litersProduced,
       batchNo: editBatch?.batchNo || '',
     },
   })
 
-  const batchCount = watch('batchCount') || 1
-  const totalUreaNeeded = UREA_PER_BATCH_KG * batchCount
-  const totalLitersProduced = LITERS_PER_BATCH * batchCount
+  const toNumber = (value: number | undefined) => (Number.isFinite(value) ? (value as number) : 0)
+  const batchCount = toNumber(watch('batchCount')) || 1
+  const totalUreaNeeded = toNumber(watch('ureaKg'))
+  const totalLitersProduced = toNumber(watch('litersProduced'))
   // When editing, deleting the old batch first restores its Urea, so that
   // amount is available for the replacement batch.
-  const availableUreaStock = currentUreaStock + (editBatch ? editBatch.batchCount * UREA_PER_BATCH_KG : 0)
+  const availableUreaStock = currentUreaStock + (editBatch ? editBatch.ureaKg : 0)
   const hasEnoughUrea = availableUreaStock >= totalUreaNeeded
-  const ureaBags = UREA_PER_BATCH_KG / KG_PER_BAG
 
   const onSubmit = async (data: FormData) => {
     if (!hasEnoughUrea) {
@@ -104,8 +111,9 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
           date: data.date,
           type: 'PRODUCE_BATCH',
           category: 'UREA',
-          quantity: -totalUreaNeeded,
+          quantity: -data.ureaKg,
           unit: 'KG',
+          litersProduced: data.litersProduced,
           batchCount: data.batchCount,
           batchNo: data.batchNo,
         }),
@@ -136,8 +144,8 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
           <DialogTitle>{isEditing ? 'Edit Production Batch' : 'Produce Batch'}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? `Replaces the existing batch: ${UREA_PER_BATCH_KG}kg Urea → ${LITERS_PER_BATCH}L Free DEF per batch`
-              : `Create production batches: ${UREA_PER_BATCH_KG}kg Urea → ${LITERS_PER_BATCH}L Free DEF per batch`}
+              ? 'Replaces the existing batch. Enter the actual urea used and Free DEF produced.'
+              : 'Enter the actual urea used and Free DEF produced.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -161,10 +169,43 @@ export function ProduceBatchForm({ onClose, currentUreaStock, editBatch }: Produ
             {errors.batchCount && (
               <p className="text-sm text-red-500 mt-1">{errors.batchCount.message}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              1 batch = {UREA_PER_BATCH_KG}kg Urea → {LITERS_PER_BATCH}L Free DEF
-            </p>
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="ureaKg">Total Urea Used (kg)</Label>
+              <Input
+                id="ureaKg"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min="0"
+                placeholder="e.g., 490"
+                {...register('ureaKg', { valueAsNumber: true })}
+              />
+              {errors.ureaKg && (
+                <p className="text-sm text-red-500 mt-1">{errors.ureaKg.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="litersProduced">Total Free DEF Produced (L)</Label>
+              <Input
+                id="litersProduced"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min="0"
+                placeholder="e.g., 1970"
+                {...register('litersProduced', { valueAsNumber: true })}
+              />
+              {errors.litersProduced && (
+                <p className="text-sm text-red-500 mt-1">{errors.litersProduced.message}</p>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Enter the totals for all {batchCount} batch{batchCount !== 1 ? 'es' : ''} together, not per batch.
+          </p>
 
           {/* Stock Check */}
           <div className={`p-4 rounded-lg border ${hasEnoughUrea ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>

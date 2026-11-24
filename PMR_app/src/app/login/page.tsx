@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { setRole } = useAuthStore()
+
+  // Middleware sends users here with ?off=1 when their only section was turned off
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('off') === '1') {
+      setError('Your section has been turned off by the admin.')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

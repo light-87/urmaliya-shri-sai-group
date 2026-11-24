@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createSession } from '@/lib/auth'
 import { triggerBackupIfNeeded } from '@/lib/backup'
+import { fetchSectionFlags } from '@/lib/sections'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,22 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'Invalid PIN' },
         { status: 401 }
       )
+    }
+
+    // LEADS and REGISTRY_MANAGER PINs only open one section each. If the admin
+    // has turned that section off, there is nothing for them to open.
+    if (pinRecord.role === 'LEADS' || pinRecord.role === 'REGISTRY_MANAGER') {
+      const flags = await fetchSectionFlags()
+      const sectionOn = pinRecord.role === 'LEADS' ? flags.leads : flags.registry
+      if (!sectionOn) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `The ${pinRecord.role === 'LEADS' ? 'Leads' : 'Registry'} section is turned off. Ask the admin to turn it on.`,
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // Create session

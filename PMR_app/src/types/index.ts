@@ -337,7 +337,6 @@ export interface StockTransaction {
 export interface StockSummary {
   ureaKg: number
   ureaBags: number
-  ureaCansProduceL: number
   freeDEF: number
   bucketsInLiters: number
   finishedGoods: number

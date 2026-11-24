@@ -22,7 +22,6 @@ import { useAuthStore } from '@/store/authStore'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { PackagePlus, Factory, RefreshCw, AlertCircle } from 'lucide-react'
 import type { StockTransaction, StockSummary } from '@/types'
-import { LITERS_PER_BATCH } from '@/types'
 
 interface PendingDelete {
   id: string
@@ -122,10 +121,16 @@ export default function StockBoardPage() {
     const freeDEFLeg = group.find(t => t.category === 'FREE_DEF')
     if (!ureaLeg || !freeDEFLeg) return
 
+    // Batch count has no column; read it from the description the API writes
+    // ("Production: N batch..."). Kg and litres come from the stored legs.
+    const countMatch = /Production:\s*(\d+)\s*batch/i.exec(ureaLeg.description || '')
     setEditingBatch({
       ureaLegId: ureaLeg.id,
       date: ureaLeg.date,
-      batchCount: Math.max(1, Math.round(freeDEFLeg.quantity / LITERS_PER_BATCH)),
+      batchCount: countMatch ? Math.max(1, parseInt(countMatch[1], 10)) : 1,
+      ureaKg: Math.abs(ureaLeg.quantity),
+      litersProduced: Math.abs(freeDEFLeg.quantity),
+      batchNo: ureaLeg.batchNo || freeDEFLeg.batchNo || '',
     })
   }
 

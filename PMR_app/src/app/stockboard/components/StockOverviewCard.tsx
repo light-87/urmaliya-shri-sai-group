@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Package, Beaker, Package2, Box } from 'lucide-react'
 import type { StockSummary } from '@/types'
-import { UREA_PER_BATCH_KG, KG_PER_BAG } from '@/types'
+import { KG_PER_BAG } from '@/types'
 
 interface StockOverviewCardProps {
   summary: StockSummary | null
@@ -11,8 +11,6 @@ export function StockOverviewCard({ summary }: StockOverviewCardProps) {
   if (!summary) {
     return <div>Loading...</div>
   }
-
-  const batchesCanProduce = Math.floor(summary.ureaKg / UREA_PER_BATCH_KG)
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -35,15 +33,6 @@ export function StockOverviewCard({ summary }: StockOverviewCardProps) {
                 <div className="text-sm text-amber-600">
                   ≈ {summary.ureaBags.toFixed(1)} bags ({KG_PER_BAG}kg each)
                 </div>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-amber-200">
-              <div className="text-sm text-amber-700 font-medium mb-1">Production Capacity</div>
-              <div className="text-lg font-semibold text-amber-900">
-                {summary.ureaCansProduceL.toLocaleString()} L
-              </div>
-              <div className="text-xs text-amber-600">
-                ({batchesCanProduce} batch{batchesCanProduce !== 1 ? 'es' : ''} × 1000L)
               </div>
             </div>
           </div>

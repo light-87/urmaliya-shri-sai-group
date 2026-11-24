@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuthStore } from '@/store/authStore'
 import { useModeStore } from '@/store/modeStore'
+import { useSectionStore } from '@/store/sectionStore'
+import { sectionForHref } from '@/lib/sections'
 import { cn } from '@/lib/utils'
 import { Menu, X, LogOut } from 'lucide-react'
 
@@ -14,8 +16,19 @@ export function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const { role, clearAuth } = useAuthStore()
-  const { mode, toggleMode } = useModeStore()
+  const { mode, toggleMode, setMode } = useModeStore()
+  const { flags, loaded: flagsLoaded, fetchFlags } = useSectionStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const registryOn = flags.registry
+
+  useEffect(() => {
+    if (role) fetchFlags()
+  }, [role, fetchFlags])
+
+  // A browser may still remember Registry mode from before it was turned off
+  useEffect(() => {
+    if (flagsLoaded && !registryOn && mode === 'REGISTRY') setMode('DEF')
+  }, [flagsLoaded, registryOn, mode, setMode])
 
   const handleLogout = async () => {
     try {
@@ -69,9 +82,13 @@ export function Header() {
 
   const navItems = getNavItems()
 
-  const visibleNavItems = navItems.filter(item =>
-    role && item.roles.includes(role)
-  )
+  // Sections the admin turned off are hidden (flags start all-off, so
+  // nothing flashes in before they load)
+  const visibleNavItems = navItems.filter(item => {
+    if (!role || !item.roles.includes(role)) return false
+    const section = sectionForHref(item.href)
+    return section === null || flags[section]
+  })
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -106,8 +123,8 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mode Toggle - Only for Admin */}
-          {role === 'ADMIN' && (
+          {/* Mode Toggle - Only for Admin, and only while Registry is on */}
+          {role === 'ADMIN' && registryOn && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
               <span className={cn(
                 'text-xs font-medium transition-colors',

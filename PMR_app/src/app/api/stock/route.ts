@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 import { StockTransactionType, StockCategory, StockUnit, BucketType } from '@/types'
-import { BUCKET_SIZES, UREA_PER_BATCH_KG, LITERS_PER_BATCH, KG_PER_BAG } from '@/types'
+import { BUCKET_SIZES, KG_PER_BAG } from '@/types'
 import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +28,8 @@ const createStockSchema = z.object({
   description: z.string().optional(),
   batchNo: z.string().optional(),
   batchCount: z.number().optional(),
+  // PRODUCE_BATCH only: litres of Free DEF actually produced (entered by hand)
+  litersProduced: z.number().optional(),
 })
 
 // GET - Fetch stock transactions and summary
@@ -57,7 +59,6 @@ export async function GET(request: NextRequest) {
         summary: {
           ureaKg: 0,
           ureaBags: 0,
-          ureaCansProduceL: 0,
           freeDEF: 0,
           bucketsInLiters: 0,
           finishedGoods: 0,
@@ -177,10 +178,22 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle production batch (Urea → Free DEF)
+// Urea used and litres produced are entered by hand (they vary per batch and
+// per machine), so nothing here is calculated from a fixed ratio.
 async function handleProduceBatch(data: z.infer<typeof createStockSchema>) {
   const batchCount = data.batchCount || 1
-  const totalUreaNeeded = UREA_PER_BATCH_KG * batchCount
-  const totalLitersProduced = LITERS_PER_BATCH * batchCount
+  const totalUreaNeeded = Math.abs(data.quantity)
+  const totalLitersProduced = data.litersProduced ?? 0
+
+  if (!(totalUreaNeeded > 0) || !(totalLitersProduced > 0)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Enter both the urea used (kg) and the Free DEF produced (L). If these fields are missing, refresh the app.',
+      },
+      { status: 400 }
+    )
+  }
 
   // Check if this is a backdated transaction for UREA
   const latestUreaStock = await getCurrentStock(StockCategory.UREA)
@@ -655,7 +668,6 @@ async function calculateStockSummary() {
   return {
     ureaKg,
     ureaBags: Number((ureaKg / KG_PER_BAG).toFixed(2)),
-    ureaCansProduceL: Math.floor(ureaKg / UREA_PER_BATCH_KG) * LITERS_PER_BATCH,
     freeDEF,
     bucketsInLiters,
     finishedGoods,
